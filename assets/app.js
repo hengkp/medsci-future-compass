@@ -225,8 +225,7 @@ function resetQuizState() {
 window.restartQuiz = function restartQuiz() {
   resetQuizState();
   hideCertificateForm(true);
-  switchView("view-result", "view-quiz");
-  renderQuestion();
+  switchView("view-result", "view-landing");
 };
 
 function hideCertificateForm(hide) {

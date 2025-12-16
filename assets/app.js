@@ -1,7 +1,8 @@
 // web/assets/app.js
 const { LIFF_ID, GAS_WEBAPP_URL, OA_URL } = window.APP_CONFIG;
 
-let lineUserId = "";
+let lineUserId = "";     // will stay "" in guest mode
+let lineDisplayName = ""; // optional
 let currentQ = 0;
 let scores = { SCIENTIST: 0, DATA: 0, HEALER: 0, CREATIVE: 0 };
 let userAnswers = [];
@@ -39,15 +40,6 @@ const questions = [
   ]},
 ];
 
-/**
- * Upgraded archetypes (as you requested)
- * - thTitle: ไทย (ใช้ใน Google Sheet / ผลลัพธ์สั้น)
- * - enName: English archetype name
- * - desc: คำอธิบายหลัก
- * - tip: คำแนะนำพัฒนาตนเอง
- * - jobs: list อาชีพ
- * - wow: boolean (โชว์ banner “ว้าว!”)
- */
 const archetypes = {
   HEALER: {
     thTitle: "ผู้เยียวยาสังคม",
@@ -55,11 +47,7 @@ const archetypes = {
     icon: "❤️",
     desc: "หัวใจของคุณคือผู้ให้! มีความเห็นอกเห็นใจผู้อื่น และชอบทำงานที่ได้ช่วยเหลือผู้คนโดยตรง",
     tip: "ทักษะการสื่อสารและจิตวิทยาเป็นอาวุธสำคัญของคุณ พัฒนามันให้ดีเยี่ยม",
-    jobs: [
-      "บุคลากรทางการแพทย์",
-      "นักสาธารณสุข",
-      "เจ้าหน้าที่ควบคุมคุณภาพบริการ",
-    ],
+    jobs: ["บุคลากรทางการแพทย์", "นักสาธารณสุข", "เจ้าหน้าที่ควบคุมคุณภาพบริการ"],
     wow: false,
   },
   DATA: {
@@ -68,11 +56,7 @@ const archetypes = {
     icon: "💻",
     desc: "คุณมองเห็นรูปแบบที่คนอื่นมองไม่เห็น! ชอบใช้ตรรกะและตัวเลขในการไขปัญหาซับซ้อน",
     tip: "ลองศึกษาเรื่อง AI หรือการเขียนโปรแกรมเบื้องต้น จะช่วยติดปีกให้ความฝันคุณ",
-    jobs: [
-      "นักวิเคราะห์ข้อมูลสุขภาพ (Health Data)",
-      "นักสถิติการแพทย์",
-      "ผู้เชี่ยวชาญเทคโนโลยีสุขภาพ",
-    ],
+    jobs: ["นักวิเคราะห์ข้อมูลสุขภาพ (Health Data)", "นักสถิติการแพทย์", "ผู้เชี่ยวชาญเทคโนโลยีสุขภาพ"],
     wow: true,
   },
   CREATIVE: {
@@ -81,11 +65,7 @@ const archetypes = {
     icon: "🎨",
     desc: "จินตนาการของคุณไม่มีที่สิ้นสุด! คุณสามารถเปลี่ยนเรื่องยากๆ ให้เข้าใจง่ายและสวยงาม",
     tip: "ลองนำศิลปะมาผสมกับวิทยาศาสตร์ดูสิ คุณอาจสร้างสื่อการแพทย์ที่ล้ำสุดๆ ได้",
-    jobs: [
-      "นักออกแบบผลิตภัณฑ์สุขภาพ",
-      "Medical Illustrator",
-      "นักสื่อสารวิทยาศาสตร์สุขภาพ",
-    ],
+    jobs: ["นักออกแบบผลิตภัณฑ์สุขภาพ", "Medical Illustrator", "นักสื่อสารวิทยาศาสตร์สุขภาพ"],
     wow: false,
   },
   SCIENTIST: {
@@ -94,11 +74,7 @@ const archetypes = {
     icon: "🔬",
     desc: "คุณคือยอดนักสืบแห่งโลกจุลทรรศน์! ช่างสังเกต ชอบค้นหาคำตอบด้วยเหตุผล และไม่ยอมแพ้ต่อปริศนา",
     tip: "ฝึกฝนทักษะการสังเกตและการตั้งคำถาม 'ทำไม' บ่อยๆ คือกุญแจสู่ความสำเร็จของคุณ",
-    jobs: [
-      "นักวิทยาศาสตร์การแพทย์",
-      "เจ้าหน้าที่ห้องปฏิบัติการ",
-      "นักวิจัย/นักนิติวิทยาศาสตร์",
-    ],
+    jobs: ["นักวิทยาศาสตร์การแพทย์", "เจ้าหน้าที่ห้องปฏิบัติการ", "นักวิจัย/นักนิติวิทยาศาสตร์"],
     wow: true,
   },
 };
@@ -113,79 +89,59 @@ function setStatus(ok, html) {
   statusDiv.innerHTML = html;
 }
 
-// Optional
-function showDebug(obj) {
-  const d = $("debug-info");
-  if (!d) return;
-  d.style.display = "block";
-  d.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
-}
-
-function cleanHref() {
-  return location.origin + location.pathname + location.search;
-}
-
-// --- LIFF init (guest mode in external browser) ---
+/**
+ * ✅ KEY CHANGE:
+ * - init LIFF if possible
+ * - DO NOT call liff.login() at all
+ * - If logged in, use profile; else guest mode
+ */
 window.addEventListener("load", async () => {
   const startBtn = $("btn-start");
 
   const fallbackTimer = setTimeout(() => {
     if (startBtn.disabled) {
-      setStatus(false, "👤 โหมดบุคคลทั่วไป");
+      setStatus(false, "👤 โหมดบุคคลทั่วไป (เข้าเล่นได้เลย)");
       startBtn.disabled = false;
-      // showDebug({ reason: "timeout", href: location.href, ua: navigator.userAgent });
     }
   }, 8000);
 
+  // If LIFF SDK not loaded -> guest mode
   if (typeof liff === "undefined") {
     clearTimeout(fallbackTimer);
-    setStatus(false, "👤 โหมดบุคคลทั่วไป");
+    setStatus(false, "👤 โหมดบุคคลทั่วไป (เข้าเล่นได้เลย)");
     startBtn.disabled = false;
-    // showDebug({ reason: "liff undefined", href: location.href });
     return;
   }
 
   try {
-    await liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true });
+    await liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: false });
     await liff.ready;
     clearTimeout(fallbackTimer);
 
-    const inLineClient = liff.isInClient();
+    // If user is already logged in -> get profile (no forcing)
+    if (liff.isLoggedIn && liff.isLoggedIn()) {
+      const profile = await liff.getProfile();
+      lineUserId = profile?.userId || "";
+      lineDisplayName = profile?.displayName || "";
 
-    if (!liff.isLoggedIn()) {
-      if (inLineClient) {
-        // In LINE app -> login
-        setStatus(false, `<span class="loader !w-4 !h-4"></span> กำลังยืนยันตัวตน...`);
-        liff.login({ redirectUri: cleanHref() });
-        return;
-      } else {
-        // External -> Guest mode (no forced login)
-        setStatus(false, "👤 โหมดบุคคลทั่วไป (เล่นได้เลย)");
-        startBtn.disabled = false;
-        // showDebug({ guest: true, reason: "external browser - skip login", href: location.href });
-        return;
-      }
+      setStatus(true, `✅ ยินดีต้อนรับคุณ ${lineDisplayName || "ครับ"} ✨`);
+
+      // email only if scope email enabled AND user is logged in
+      const token = liff.getDecodedIDToken?.();
+      const email = token?.email;
+      if (email && $("inp-email") && !$("inp-email").value) $("inp-email").value = email;
+    } else {
+      // Not logged in -> guest mode
+      setStatus(false, "👤 โหมดบุคคลทั่วไป (เข้าเล่นได้เลย)");
     }
 
-    const profile = await liff.getProfile();
-    lineUserId = profile?.userId || "";
-
-    setStatus(true, `✅ ยินดีต้อนรับคุณ ${profile?.displayName || "ครับ"} ✨`);
     startBtn.disabled = false;
     startBtn.classList.add("pulse-slow");
-
-    // email (only if enabled in LIFF scopes)
-    const token = liff.getDecodedIDToken?.();
-    const email = token?.email;
-    if (email && $("inp-email") && !$("inp-email").value) $("inp-email").value = email;
-
-    // showDebug({ ok: true, isInClient: liff.isInClient(), os: liff.getOS?.(), href: location.href, userId: lineUserId });
-
   } catch (err) {
+    // Any LIFF error -> guest mode
     clearTimeout(fallbackTimer);
     setStatus(false, "👤 โหมดบุคคลทั่วไป (เข้าเล่นได้เลย)");
     startBtn.disabled = false;
-    // showDebug({ ok: false, error: { name: err?.name, message: err?.message, code: err?.code }, href: location.href });
   }
 });
 
@@ -226,7 +182,6 @@ function renderQuestion() {
 }
 
 function computeResultType() {
-  // default tie-break based on order (SCIENTIST->DATA->HEALER->CREATIVE) by max reducer
   return Object.keys(scores).reduce((a, b) => (scores[a] > scores[b] ? a : b));
 }
 
@@ -277,11 +232,11 @@ window.submitForm = async function submitForm() {
       phone: $("inp-phone").value.trim(),
       email: $("inp-email").value.trim(),
 
-      // save richer result too
       resultType: type,
       resultTH: r.thTitle,
       resultEN: r.enName,
 
+      // ✅ will be "" in guest mode
       lineUserId,
 
       q1: userAnswers[0] || "",

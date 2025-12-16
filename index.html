@@ -1,286 +1,380 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>The Future Compass</title>
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
-    
-    <!-- LIFF SDK -->
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>The Future Compass</title>
 
-    <style>
-        :root {
-            --primary: #0d9488; /* Teal-600 */
-            --primary-dark: #0f766e; /* Teal-700 */
-            --accent: #f59e0b; /* Amber-500 */
-            --bg-soft: #f0fdfa;
-        }
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
 
-        body { 
-            font-family: 'Sarabun', sans-serif; 
-            background: linear-gradient(135deg, #e0f2fe 0%, #f0fdfa 100%);
-            height: 100vh;
-            padding-top: env(safe-area-inset-top);
-            padding-bottom: env(safe-area-inset-bottom);
-            overflow: hidden; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0;
-        }
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&family=Sarabun:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-        h1, h2, h3, button, .font-heading { font-family: 'Kanit', sans-serif; }
+  <!-- LIFF SDK -->
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 
-        /* Modern Glass Card */
-        .glass-card {
-            background: rgba(255, 255, 255, 0.92);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.8);
-            width: 100%;
-            height: 100%;
-            max-width: 500px; 
-            max-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 10px 40px -10px rgba(13, 148, 136, 0.2);
-            position: relative;
-            border-radius: 0;
-        }
+  <style>
+    :root{
+      --primary:#0d9488;
+      --primary-dark:#0f766e;
+      --accent:#f59e0b;
+      --bg-soft:#f0fdfa;
+    }
 
-        @media (min-width: 640px) {
-            .glass-card {
-                height: auto;
-                max-height: 90vh;
-                border-radius: 24px;
-            }
-        }
+    body{
+      font-family:'Sarabun',sans-serif;
+      background:linear-gradient(135deg,#e0f2fe 0%,#f0fdfa 100%);
+      height:100vh;
+      padding-top:env(safe-area-inset-top);
+      padding-bottom:env(safe-area-inset-bottom);
+      overflow:hidden;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      margin:0;
+    }
 
-        .scroll-content {
-            flex-grow: 1;
-            overflow-y: auto;
-            overflow-x: hidden;
-            padding: 24px;
-            scrollbar-width: thin;
-            -webkit-overflow-scrolling: touch;
-        }
+    h1,h2,h3,button,.font-heading{font-family:'Kanit',sans-serif;}
 
-        /* Animations */
-        .slide-up { animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+    .glass-card{
+      background:rgba(255,255,255,.92);
+      backdrop-filter:blur(16px);
+      -webkit-backdrop-filter:blur(16px);
+      border:1px solid rgba(255,255,255,.8);
+      width:100%;
+      height:100%;
+      max-width:500px;
+      max-height:100vh;
+      display:flex;
+      flex-direction:column;
+      box-shadow:0 10px 40px -10px rgba(13,148,136,.2);
+      position:relative;
+      border-radius:0;
+      font-size:18px;
+      line-height:1.65;
+    }
 
-        .pulse-slow { animation: pulseSlow 3s infinite; }
-        @keyframes pulseSlow { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+    @media (min-width:640px){
+      .glass-card{
+        height:auto;
+        max-height:90vh;
+        border-radius:24px;
+        font-size:18px;
+      }
+    }
 
-        /* Buttons */
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-            color: white;
-            font-size: 1.125rem;
-            font-weight: 600;
-            padding: 16px 20px;
-            border-radius: 16px;
-            width: 100%;
-            text-align: center;
-            transition: all 0.2s ease;
-            box-shadow: 0 8px 20px -6px rgba(13, 148, 136, 0.4);
-            border: none;
-            cursor: pointer;
-        }
-        .btn-primary:active { transform: scale(0.96); box-shadow: 0 4px 10px -4px rgba(13, 148, 136, 0.4); }
-        .btn-primary:disabled { background: #cbd5e1; cursor: not-allowed; box-shadow: none; transform: none; }
+    .scroll-content{
+      flex-grow:1;
+      overflow-y:auto;
+      overflow-x:hidden;
+      padding:24px;
+      font-size:1rem;
+      scrollbar-width:thin;
+      -webkit-overflow-scrolling:touch;
+    }
 
-        .choice-btn {
-            background: white;
-            border: 2px solid #e2e8f0;
-            padding: 16px;
-            border-radius: 16px;
-            width: 100%;
-            margin-bottom: 12px;
-            text-align: left;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            color: #334155;
-            font-size: 1rem;
-            font-weight: 500;
-            transition: all 0.2s;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        }
-        .choice-btn:active { 
-            border-color: var(--primary); 
-            background-color: #f0fdfa; 
-            color: var(--primary-dark); 
-            transform: scale(0.99);
-        }
+    .slide-up{animation:slideUp .6s cubic-bezier(.16,1,.3,1) forwards;}
+    @keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
 
-        .input-field {
-            width: 100%;
-            padding: 14px 16px;
-            border-radius: 14px;
-            border: 2px solid #e2e8f0;
-            background: #f8fafc;
-            font-size: 16px;
-            outline: none;
-            transition: all 0.2s;
-            color: #1e293b;
-        }
-        .input-field:focus { 
-            border-color: var(--primary); 
-            background: white; 
-            box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.1); 
-        }
-        .input-field::placeholder { color: #94a3b8; }
+    .pulse-slow{animation:pulseSlow 3s infinite;}
+    @keyframes pulseSlow{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
 
-        .loader { border: 3px solid #e2e8f0; border-top: 3px solid #ffffff; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        
-        .hidden { display: none !important; }
-        #debug-info { font-size: 10px; color: #9ca3af; margin-top: 10px; display: none;}
-    </style>
+    .btn-primary{
+      background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);
+      color:#fff;
+      font-size:1.125rem;
+      font-weight:600;
+      padding:16px 20px;
+      border-radius:16px;
+      width:100%;
+      text-align:center;
+      transition:all .2s ease;
+      box-shadow:0 8px 20px -6px rgba(13,148,136,.4);
+      border:none;
+      cursor:pointer;
+    }
+    .btn-primary:active{transform:scale(.96);box-shadow:0 4px 10px -4px rgba(13,148,136,.4)}
+    .btn-primary:disabled{background:#cbd5e1;cursor:not-allowed;box-shadow:none;transform:none}
+
+    .choice-btn{
+      background:#fff;
+      border:2px solid #e2e8f0;
+      padding:18px;
+      border-radius:16px;
+      width:100%;
+      margin-bottom:12px;
+      text-align:left;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      color:#334155;
+      font-size:1.15rem;
+      font-weight:500;
+      transition:all .2s;
+      box-shadow:0 2px 4px rgba(0,0,0,.02);
+    }
+    .choice-btn:active{
+      border-color:var(--primary);
+      background-color:#f0fdfa;
+      color:var(--primary-dark);
+      transform:scale(.99);
+    }
+
+    .input-field{
+      width:100%;
+      padding:16px 18px;
+      border-radius:14px;
+      border:2px solid #e2e8f0;
+      background:#f8fafc;
+      font-size:18px;
+      outline:none;
+      transition:all .2s;
+      color:#1e293b;
+    }
+    .input-field:focus{
+      border-color:var(--primary);
+      background:#fff;
+      box-shadow:0 0 0 4px rgba(13,148,136,.1);
+    }
+    .input-field::placeholder{color:#94a3b8}
+
+    .loader{
+      border:3px solid #e2e8f0;
+      border-top:3px solid #ffffff;
+      border-radius:50%;
+      width:24px;
+      height:24px;
+      animation:spin 1s linear infinite;
+      display:inline-block;
+      vertical-align:middle;
+    }
+    @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+
+    .hidden{display:none!important;}
+
+    #liff-status{
+      font-size:1.1rem;
+      font-weight:700;
+      padding:14px 16px;
+      border-radius:16px;
+    }
+    #q-text{
+      font-size:1.35rem;
+      line-height:1.6;
+    }
+    #view-landing h2{font-size:1.75rem;}
+    #view-landing p{font-size:1.1rem;}
+
+    /* Result rich text blocks */
+    .result-block{
+      background:#fff;
+      border:1px solid rgba(13,148,136,.15);
+      border-radius:18px;
+      padding:18px;
+      box-shadow:0 6px 18px -14px rgba(2,132,199,.25);
+      text-align:left;
+    }
+    .result-title{
+      font-size:1.6rem;
+      font-weight:800;
+      color:#0f172a;
+      line-height:1.25;
+    }
+    .result-subtitle{
+      font-size:1.1rem;
+      font-weight:700;
+      color:#0d9488;
+    }
+    .result-paragraph{
+      font-size:1.05rem;
+      color:#475569;
+      line-height:1.7;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:.5rem;
+      padding:10px 12px;
+      border-radius:14px;
+      font-weight:800;
+    }
+  </style>
 </head>
+
 <body>
+  <div class="glass-card">
 
-    <div class="glass-card">
-        
-        <!-- Header -->
-        <div class="h-20 bg-gradient-to-r from-teal-700 to-teal-600 flex items-center justify-center text-white relative flex-shrink-0 shadow-md z-10 sm:rounded-t-2xl">
-            <div class="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/medical-icons.png')]"></div>
-            <div class="font-heading text-xl font-bold tracking-wide flex items-center gap-2 z-10">
-                <span class="text-3xl filter drop-shadow-md">🧭</span> 
-                <span class="drop-shadow-sm">The Future Compass</span>
-            </div>
-        </div>
-
-        <!-- Content -->
-        <div class="scroll-content" id="main-scroll">
-            
-            <!-- STEP 1: Landing -->
-            <div id="view-landing" class="slide-up flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8">
-                <div class="relative">
-                    <div class="absolute inset-0 bg-teal-200 blur-2xl opacity-40 rounded-full animate-pulse"></div>
-                    <div class="bg-white p-6 rounded-3xl shadow-xl relative pulse-slow border border-teal-50">
-                        <span class="text-6xl block">🧬</span>
-                    </div>
-                </div>
-                
-                <div>
-                    <h2 class="text-2xl font-bold text-teal-900 mb-3">ค้นหาตัวตน...คนมีฝัน</h2>
-                    <p class="text-gray-600 text-base px-6 leading-relaxed">
-                        ร่วมผจญภัยในโลกวิทยาศาสตร์สุขภาพ<br>เพื่อค้นหาอาชีพที่ใช่สำหรับคุณ!
-                    </p>
-                </div>
-                
-                <!-- Status Indicator -->
-                <div class="w-full px-6 space-y-4">
-                    <div id="liff-status" class="text-sm text-teal-700 font-medium bg-teal-50 py-2 px-4 rounded-xl flex items-center justify-center gap-2 border border-teal-100">
-                        <span class="loader !border-teal-200 !border-t-teal-600 !w-4 !h-4"></span> 
-                        กำลังเชื่อมต่อระบบ...
-                    </div>
-                    <button id="btn-start" onclick="startQuiz()" class="btn-primary transform hover:-translate-y-1" disabled>
-                        เริ่มค้นหาตัวตน 🚀
-                    </button>
-                    <pre id="debug-info" class="mt-2 text-left whitespace-pre-wrap break-words"></pre>
-                </div>
-            </div>
-
-            <!-- STEP 2: Quiz -->
-            <div id="view-quiz" class="hidden slide-up h-full flex flex-col">
-                <div class="flex justify-between items-center mb-8">
-                    <span class="text-sm font-bold text-teal-700 bg-teal-50 px-3 py-1 rounded-lg border border-teal-100">ข้อที่ <span id="q-num">1</span>/5</span>
-                    <div class="w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div id="progress-bar" class="h-full bg-teal-500 transition-all duration-500 ease-out" style="width: 20%"></div>
-                    </div>
-                </div>
-                
-                <h3 id="q-text" class="text-xl font-bold text-gray-800 mb-8 leading-relaxed text-center min-h-[4rem] flex items-center justify-center">...</h3>
-                
-                <div id="q-answers" class="space-y-3 pb-6"></div>
-            </div>
-
-            <!-- STEP 3: Result & Form -->
-            <div id="view-result" class="hidden slide-up">
-                <!-- Result Section -->
-                <div class="text-center mb-8 bg-gradient-to-b from-white to-teal-50 p-6 rounded-2xl border border-teal-100 shadow-sm">
-                    <div class="inline-block relative mb-3">
-                        <div class="absolute inset-0 bg-yellow-200 rounded-full blur-xl opacity-50"></div>
-                        <div id="res-icon" class="relative text-7xl">✨</div>
-                    </div>
-                    <p class="text-xs font-bold text-teal-600 uppercase tracking-widest mb-1">ผลลัพธ์ของคุณ</p>
-                    <h2 id="res-title" class="text-3xl font-bold text-gray-900 mb-2">...</h2>
-                    <p id="res-desc" class="text-base text-gray-600 leading-relaxed">...</p>
-                </div>
-
-                <!-- Registration Form -->
-                <div>
-                    <h3 class="text-base font-bold text-teal-800 mb-4 flex items-center gap-2 px-1">
-                        <span class="bg-teal-100 text-teal-700 p-1 rounded-md"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg></span>
-                        ลงทะเบียนรับเกียรติบัตร
-                    </h3>
-                    <form id="regis-form" onsubmit="event.preventDefault(); submitForm();" class="space-y-4">
-                        <input type="text" id="inp-name" required class="input-field" placeholder="ชื่อ-นามสกุล (ภาษาไทย) *">
-                        
-                        <div class="grid grid-cols-2 gap-3">
-                            <select id="inp-grade" required class="input-field appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230d9488%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:12px] bg-[right_1rem_center]">
-                                <option value="">ระดับชั้น *</option>
-                                <option value="ม.1">ม.1</option>
-                                <option value="ม.2">ม.2</option>
-                                <option value="ม.3">ม.3</option>
-                                <option value="ม.4">ม.4</option>
-                                <option value="ม.5">ม.5</option>
-                                <option value="ม.6">ม.6</option>
-                                <option value="อื่นๆ">อื่นๆ</option>
-                            </select>
-                            <input type="text" id="inp-province" required class="input-field" placeholder="จังหวัด *">
-                        </div>
-
-                        <input type="text" id="inp-school" required class="input-field" placeholder="โรงเรียน *">
-
-                        <div class="grid grid-cols-2 gap-3">
-                            <input type="tel" id="inp-phone" required class="input-field" placeholder="เบอร์โทร *">
-                            <input type="email" id="inp-email" required class="input-field" placeholder="อีเมล *">
-                        </div>
-
-                        <div class="pt-6 pb-8">
-                            <button type="submit" id="btn-submit" class="btn-primary shadow-lg text-lg">
-                                ยืนยันข้อมูล
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- STEP 4: Success -->
-            <div id="view-success" class="hidden slide-up flex flex-col items-center justify-center min-h-[70vh] text-center">
-                <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6 text-green-600 ring-8 ring-green-50 shadow-sm animate-bounce">
-                    <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
-                </div>
-                <h2 class="text-2xl font-bold text-gray-900 mb-2">ลงทะเบียนสำเร็จ!</h2>
-                
-                <div class="bg-white p-6 rounded-2xl border border-gray-100 text-base text-gray-600 mb-8 w-full shadow-sm">
-                    <p class="mb-3">ขอบคุณที่เข้าร่วมกิจกรรมครับ</p>
-                    <div class="flex items-start justify-center gap-3 bg-teal-50 p-3 rounded-lg text-teal-800 text-left">
-                        <span class="text-2xl">📧</span>
-                        <span>เกียรติบัตรจะถูกส่งไปยังอีเมลของคุณ <strong>ภายใน 7 วันทำการ</strong></span>
-                    </div>
-                </div>
-                
-                <button onclick="closeApp()" class="w-full bg-[#06C755] hover:bg-[#05b54d] text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-3 text-lg transition-transform hover:scale-105 active:scale-95">
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 16 16"><path d="M8 0c4.411 0 8 2.912 8 6.492 0 1.433-.555 2.723-1.715 3.994-1.675 1.139-2.225 1.393-2.565 2.43-.099.301-.585.517-.676.126-.142-.614-.85-2.028-1.576-2.617C1.49 10.42 0 8.448 0 6.492 0 2.912 3.59 0 8 0"/></svg>
-                    กลับสู่หน้าแชท LINE
-                </button>
-            </div>
-
-        </div>
+    <!-- Header -->
+    <div class="h-20 bg-gradient-to-r from-teal-700 to-teal-600 flex items-center justify-center text-white relative flex-shrink-0 shadow-md z-10 sm:rounded-t-2xl">
+      <div class="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/medical-icons.png')]"></div>
+      <div class="font-heading text-xl font-bold tracking-wide flex items-center gap-2 z-10">
+        <span class="text-3xl filter drop-shadow-md">🧭</span>
+        <span class="drop-shadow-sm">The Future Compass</span>
+      </div>
     </div>
-    <script src="assets/config.js"></script>
-    <script src="assets/app.js"></script>
 
+    <!-- Content -->
+    <div class="scroll-content" id="main-scroll">
+
+      <!-- STEP 1: Landing -->
+      <div id="view-landing" class="slide-up flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8">
+        <div class="relative">
+          <div class="absolute inset-0 bg-teal-200 blur-2xl opacity-40 rounded-full animate-pulse"></div>
+          <div class="bg-white p-6 rounded-3xl shadow-xl relative pulse-slow border border-teal-50">
+            <span class="text-6xl block">🧬</span>
+          </div>
+        </div>
+
+        <div>
+          <h2 class="font-heading font-bold text-teal-900 mb-3">ค้นหาตัวตน...คนมีฝัน</h2>
+          <p class="text-gray-600 px-6 leading-relaxed">
+            ร่วมผจญภัยในโลกวิทยาศาสตร์สุขภาพ<br>เพื่อค้นหาอาชีพที่ใช่สำหรับคุณ!
+          </p>
+        </div>
+
+        <!-- Status Indicator -->
+        <div class="w-full px-6 space-y-4">
+          <div id="liff-status" class="text-teal-700 bg-teal-50 py-2 px-4 rounded-xl flex items-center justify-center gap-2 border border-teal-100">
+            <span class="loader !border-teal-200 !border-t-teal-600 !w-4 !h-4"></span>
+            กำลังเชื่อมต่อระบบ...
+          </div>
+
+          <button id="btn-start" onclick="startQuiz()" class="btn-primary transform hover:-translate-y-1" disabled>
+            เริ่มค้นหาตัวตน 🚀
+          </button>
+
+          <!-- Optional debug -->
+          <!-- <pre id="debug-info" class="mt-2 text-left whitespace-pre-wrap break-words text-xs text-slate-400"></pre> -->
+        </div>
+      </div>
+
+      <!-- STEP 2: Quiz -->
+      <div id="view-quiz" class="hidden slide-up h-full flex flex-col">
+        <div class="flex justify-between items-center mb-8">
+          <span class="text-sm font-bold text-teal-700 bg-teal-50 px-3 py-1 rounded-lg border border-teal-100">ข้อที่ <span id="q-num">1</span>/5</span>
+          <div class="w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div id="progress-bar" class="h-full bg-teal-500 transition-all duration-500 ease-out" style="width:20%"></div>
+          </div>
+        </div>
+
+        <h3 id="q-text" class="font-heading font-bold text-gray-800 mb-8 text-center min-h-[4rem] flex items-center justify-center">...</h3>
+        <div id="q-answers" class="space-y-3 pb-6"></div>
+      </div>
+
+      <!-- STEP 3: Result & Form -->
+      <div id="view-result" class="hidden slide-up">
+
+        <!-- Result Section (RICH) -->
+        <div class="text-center mb-6 bg-gradient-to-b from-white to-teal-50 p-6 rounded-2xl border border-teal-100 shadow-sm">
+          <div class="inline-block relative mb-3">
+            <div class="absolute inset-0 bg-yellow-200 rounded-full blur-xl opacity-50"></div>
+            <div id="res-icon" class="relative text-7xl">✨</div>
+          </div>
+
+          <p class="text-sm font-extrabold text-teal-700 tracking-wide mb-2">คุณคือ...</p>
+          <h2 id="res-title" class="font-heading text-3xl font-extrabold text-gray-900 mb-2">...</h2>
+          <p id="res-en" class="text-lg font-bold text-teal-700 mb-4">...</p>
+
+          <div class="result-block mt-4">
+            <p id="res-desc" class="result-paragraph">...</p>
+
+            <div class="mt-5 space-y-4">
+              <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                <div class="font-heading font-extrabold text-amber-700 text-lg mb-1">✨ คำแนะนำพัฒนาตนเอง:</div>
+                <div id="res-tip" class="text-slate-700 text-base leading-relaxed">...</div>
+              </div>
+
+              <div class="bg-teal-50 border border-teal-200 rounded-2xl p-4">
+                <div class="font-heading font-extrabold text-teal-800 text-lg mb-2">🎯 อาชีพที่เหมาะกับคุณ:</div>
+                <ul id="res-jobs" class="list-disc pl-6 text-slate-700 text-base leading-relaxed space-y-1"></ul>
+              </div>
+
+              <div id="res-wow" class="hidden bg-gradient-to-r from-emerald-50 to-sky-50 border border-emerald-200 rounded-2xl p-4">
+                <div class="font-heading font-extrabold text-emerald-800 text-lg mb-1">🎉 ว้าว! คุณมีแววด้านวิทยาศาสตร์การแพทย์สูงมาก</div>
+                <div class="text-slate-700 text-base leading-relaxed">
+                  หลักสูตรของเราเหมาะกับคุณสุดๆ ลองสอบถามพี่ Staff เพิ่มเติมได้เลย!
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Registration Form -->
+        <div>
+          <h3 class="text-base font-bold text-teal-800 mb-4 flex items-center gap-2 px-1">
+            <span class="bg-teal-100 text-teal-700 p-1 rounded-md">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+              </svg>
+            </span>
+            ลงทะเบียนรับเกียรติบัตร
+          </h3>
+
+          <form id="regis-form" onsubmit="event.preventDefault(); submitForm();" class="space-y-4">
+            <input type="text" id="inp-name" required class="input-field" placeholder="ชื่อ-นามสกุล (ภาษาไทย) *">
+
+            <div class="grid grid-cols-2 gap-3">
+              <select id="inp-grade" required class="input-field appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230d9488%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:12px] bg-[right_1rem_center]">
+                <option value="">ระดับชั้น *</option>
+                <option value="ม.1">ม.1</option>
+                <option value="ม.2">ม.2</option>
+                <option value="ม.3">ม.3</option>
+                <option value="ม.4">ม.4</option>
+                <option value="ม.5">ม.5</option>
+                <option value="ม.6">ม.6</option>
+                <option value="อื่นๆ">อื่นๆ</option>
+              </select>
+              <input type="text" id="inp-province" required class="input-field" placeholder="จังหวัด *">
+            </div>
+
+            <input type="text" id="inp-school" required class="input-field" placeholder="โรงเรียน *">
+
+            <div class="grid grid-cols-2 gap-3">
+              <input type="tel" id="inp-phone" required class="input-field" placeholder="เบอร์โทร *">
+              <input type="email" id="inp-email" required class="input-field" placeholder="อีเมล *">
+            </div>
+
+            <div class="pt-6 pb-8">
+              <button type="submit" id="btn-submit" class="btn-primary shadow-lg text-lg">
+                ยืนยันข้อมูล
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- STEP 4: Success -->
+      <div id="view-success" class="hidden slide-up flex flex-col items-center justify-center min-h-[70vh] text-center">
+        <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6 text-green-600 ring-8 ring-green-50 shadow-sm animate-bounce">
+          <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path>
+          </svg>
+        </div>
+
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">ลงทะเบียนสำเร็จ!</h2>
+
+        <div class="bg-white p-6 rounded-2xl border border-gray-100 text-base text-gray-600 mb-8 w-full shadow-sm">
+          <p class="mb-3">ขอบคุณที่เข้าร่วมกิจกรรมครับ</p>
+          <div class="flex items-start justify-center gap-3 bg-teal-50 p-3 rounded-lg text-teal-800 text-left">
+            <span class="text-2xl">📧</span>
+            <span>เกียรติบัตรจะถูกส่งไปยังอีเมลของคุณ <strong>ภายใน 7 วันทำการ</strong></span>
+          </div>
+        </div>
+
+        <button onclick="closeApp()" class="w-full bg-[#06C755] hover:bg-[#05b54d] text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-3 text-lg transition-transform hover:scale-105 active:scale-95">
+          <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M8 0c4.411 0 8 2.912 8 6.492 0 1.433-.555 2.723-1.715 3.994-1.675 1.139-2.225 1.393-2.565 2.43-.099.301-.585.517-.676.126-.142-.614-.85-2.028-1.576-2.617C1.49 10.42 0 8.448 0 6.492 0 2.912 3.59 0 8 0"/>
+          </svg>
+          กลับสู่หน้าแชท LINE
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script src="assets/config.js"></script>
+  <script src="assets/app.js"></script>
 </body>
 </html>

@@ -39,16 +39,73 @@ const questions = [
   ]},
 ];
 
+/**
+ * Upgraded archetypes (as you requested)
+ * - thTitle: ไทย (ใช้ใน Google Sheet / ผลลัพธ์สั้น)
+ * - enName: English archetype name
+ * - desc: คำอธิบายหลัก
+ * - tip: คำแนะนำพัฒนาตนเอง
+ * - jobs: list อาชีพ
+ * - wow: boolean (โชว์ banner “ว้าว!”)
+ */
 const archetypes = {
-  SCIENTIST: { title: "นักวิทยาศาสตร์ผู้พิทักษ์", icon: "🔬", desc: "ช่างสังเกต ชอบค้นหาคำตอบด้วยเหตุผล" },
-  DATA:      { title: "พ่อมดแห่งข้อมูล",         icon: "💻", desc: "ชอบใช้ตรรกะและตัวเลขในการไขปัญหา" },
-  HEALER:    { title: "ผู้เยียวยาสังคม",         icon: "❤️", desc: "มีความเห็นอกเห็นใจผู้อื่น ชอบช่วยเหลือ" },
-  CREATIVE:  { title: "นักนวัตกรรมสร้างสรรค์",    icon: "🎨", desc: "จินตนาการไม่มีที่สิ้นสุด สร้างสรรค์สิ่งใหม่" },
+  HEALER: {
+    thTitle: "ผู้เยียวยาสังคม",
+    enName: "The Social Healer",
+    icon: "❤️",
+    desc: "หัวใจของคุณคือผู้ให้! มีความเห็นอกเห็นใจผู้อื่น และชอบทำงานที่ได้ช่วยเหลือผู้คนโดยตรง",
+    tip: "ทักษะการสื่อสารและจิตวิทยาเป็นอาวุธสำคัญของคุณ พัฒนามันให้ดีเยี่ยม",
+    jobs: [
+      "บุคลากรทางการแพทย์",
+      "นักสาธารณสุข",
+      "เจ้าหน้าที่ควบคุมคุณภาพบริการ",
+    ],
+    wow: false,
+  },
+  DATA: {
+    thTitle: "พ่อมดแห่งข้อมูล",
+    enName: "The Data Wizard",
+    icon: "💻",
+    desc: "คุณมองเห็นรูปแบบที่คนอื่นมองไม่เห็น! ชอบใช้ตรรกะและตัวเลขในการไขปัญหาซับซ้อน",
+    tip: "ลองศึกษาเรื่อง AI หรือการเขียนโปรแกรมเบื้องต้น จะช่วยติดปีกให้ความฝันคุณ",
+    jobs: [
+      "นักวิเคราะห์ข้อมูลสุขภาพ (Health Data)",
+      "นักสถิติการแพทย์",
+      "ผู้เชี่ยวชาญเทคโนโลยีสุขภาพ",
+    ],
+    wow: true,
+  },
+  CREATIVE: {
+    thTitle: "นักนวัตกรรมสร้างสรรค์",
+    enName: "The Creative Innovator",
+    icon: "🎨",
+    desc: "จินตนาการของคุณไม่มีที่สิ้นสุด! คุณสามารถเปลี่ยนเรื่องยากๆ ให้เข้าใจง่ายและสวยงาม",
+    tip: "ลองนำศิลปะมาผสมกับวิทยาศาสตร์ดูสิ คุณอาจสร้างสื่อการแพทย์ที่ล้ำสุดๆ ได้",
+    jobs: [
+      "นักออกแบบผลิตภัณฑ์สุขภาพ",
+      "Medical Illustrator",
+      "นักสื่อสารวิทยาศาสตร์สุขภาพ",
+    ],
+    wow: false,
+  },
+  SCIENTIST: {
+    thTitle: "นักวิทยาศาสตร์ผู้พิทักษ์",
+    enName: "The Guardian Scientist",
+    icon: "🔬",
+    desc: "คุณคือยอดนักสืบแห่งโลกจุลทรรศน์! ช่างสังเกต ชอบค้นหาคำตอบด้วยเหตุผล และไม่ยอมแพ้ต่อปริศนา",
+    tip: "ฝึกฝนทักษะการสังเกตและการตั้งคำถาม 'ทำไม' บ่อยๆ คือกุญแจสู่ความสำเร็จของคุณ",
+    jobs: [
+      "นักวิทยาศาสตร์การแพทย์",
+      "เจ้าหน้าที่ห้องปฏิบัติการ",
+      "นักวิจัย/นักนิติวิทยาศาสตร์",
+    ],
+    wow: true,
+  },
 };
 
-function $(id){ return document.getElementById(id); }
+function $(id) { return document.getElementById(id); }
 
-function setStatus(ok, html){
+function setStatus(ok, html) {
   const statusDiv = $("liff-status");
   statusDiv.className = ok
     ? "text-sm text-green-700 font-bold bg-green-50 py-2 px-4 rounded-xl flex items-center justify-center gap-2 border border-green-200 shadow-sm"
@@ -56,19 +113,27 @@ function setStatus(ok, html){
   statusDiv.innerHTML = html;
 }
 
-function showDebug(obj){
+// Optional
+function showDebug(obj) {
   const d = $("debug-info");
+  if (!d) return;
   d.style.display = "block";
   d.textContent = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2);
 }
 
+function cleanHref() {
+  return location.origin + location.pathname + location.search;
+}
+
+// --- LIFF init (guest mode in external browser) ---
 window.addEventListener("load", async () => {
   const startBtn = $("btn-start");
+
   const fallbackTimer = setTimeout(() => {
     if (startBtn.disabled) {
       setStatus(false, "👤 โหมดบุคคลทั่วไป");
       startBtn.disabled = false;
-      showDebug({ reason:"timeout", href: location.href, ua: navigator.userAgent });
+      // showDebug({ reason: "timeout", href: location.href, ua: navigator.userAgent });
     }
   }, 8000);
 
@@ -76,12 +141,11 @@ window.addEventListener("load", async () => {
     clearTimeout(fallbackTimer);
     setStatus(false, "👤 โหมดบุคคลทั่วไป");
     startBtn.disabled = false;
-    showDebug({ reason:"liff undefined", href: location.href });
+    // showDebug({ reason: "liff undefined", href: location.href });
     return;
   }
 
   try {
-    // init ต้องรันที่ endpoint URL หรือใต้ endpoint เท่านั้น  [oai_citation:1‡LINE Developers](https://developers.line.biz/en/docs/liff/developing-liff-apps/?utm_source=chatgpt.com)
     await liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true });
     await liff.ready;
     clearTimeout(fallbackTimer);
@@ -90,15 +154,15 @@ window.addEventListener("load", async () => {
 
     if (!liff.isLoggedIn()) {
       if (inLineClient) {
-        // อยู่ในแอป LINE → login ได้ (เพื่อเอา userId)
+        // In LINE app -> login
         setStatus(false, `<span class="loader !w-4 !h-4"></span> กำลังยืนยันตัวตน...`);
         liff.login({ redirectUri: cleanHref() });
-        return; // จะ redirect กลับมาเอง
+        return;
       } else {
-        // อยู่นอก LINE → ไม่บังคับ login (Guest mode)
-        setStatus(false, "👤 โหมดบุคคลทั่วไป");
-        document.getElementById("btn-start").disabled = false;
-        showDebug({ guest: true, reason: "external browser - skip login", href: location.href });
+        // External -> Guest mode (no forced login)
+        setStatus(false, "👤 โหมดบุคคลทั่วไป (เล่นได้เลย)");
+        startBtn.disabled = false;
+        // showDebug({ guest: true, reason: "external browser - skip login", href: location.href });
         return;
       }
     }
@@ -106,21 +170,22 @@ window.addEventListener("load", async () => {
     const profile = await liff.getProfile();
     lineUserId = profile?.userId || "";
 
-    setStatus(true, `✅ สวัสดี ${profile?.displayName || "ครับ"}`);
+    setStatus(true, `✅ ยินดีต้อนรับคุณ ${profile?.displayName || "ครับ"} ✨`);
     startBtn.disabled = false;
     startBtn.classList.add("pulse-slow");
 
-    // email จะได้เมื่อเปิด scope email ใน LIFF settings เท่านั้น
+    // email (only if enabled in LIFF scopes)
     const token = liff.getDecodedIDToken?.();
     const email = token?.email;
     if (email && $("inp-email") && !$("inp-email").value) $("inp-email").value = email;
 
-    showDebug({ ok:true, isInClient:liff.isInClient(), os:liff.getOS?.(), href:location.href, userId: lineUserId });
+    // showDebug({ ok: true, isInClient: liff.isInClient(), os: liff.getOS?.(), href: location.href, userId: lineUserId });
+
   } catch (err) {
     clearTimeout(fallbackTimer);
-    setStatus(false, "👤 โหมดบุคคลทั่วไป");
+    setStatus(false, "👤 โหมดบุคคลทั่วไป (เข้าเล่นได้เลย)");
     startBtn.disabled = false;
-    showDebug({ ok:false, error:{ name:err?.name, message:err?.message, code:err?.code }, href:location.href });
+    // showDebug({ ok: false, error: { name: err?.name, message: err?.message, code: err?.code }, href: location.href });
   }
 });
 
@@ -160,12 +225,36 @@ function renderQuestion() {
   });
 }
 
-function showResult() {
-  const maxType = Object.keys(scores).reduce((a,b)=> scores[a] > scores[b] ? a : b);
-  const r = archetypes[maxType];
+function computeResultType() {
+  // default tie-break based on order (SCIENTIST->DATA->HEALER->CREATIVE) by max reducer
+  return Object.keys(scores).reduce((a, b) => (scores[a] > scores[b] ? a : b));
+}
+
+function setResultUI(type) {
+  const r = archetypes[type];
+
   $("res-icon").innerText = r.icon;
-  $("res-title").innerText = r.title;
+  $("res-title").innerText = r.thTitle;
+  $("res-en").innerText = r.enName;
   $("res-desc").innerText = r.desc;
+  $("res-tip").innerText = r.tip;
+
+  const jobsUl = $("res-jobs");
+  jobsUl.innerHTML = "";
+  r.jobs.forEach(j => {
+    const li = document.createElement("li");
+    li.textContent = j;
+    jobsUl.appendChild(li);
+  });
+
+  const wow = $("res-wow");
+  if (r.wow) wow.classList.remove("hidden");
+  else wow.classList.add("hidden");
+}
+
+function showResult() {
+  const type = computeResultType();
+  setResultUI(type);
   switchView("view-quiz", "view-result");
 }
 
@@ -175,7 +264,8 @@ window.submitForm = async function submitForm() {
   btn.disabled = true;
   btn.innerHTML = '<span class="loader"></span>';
 
-  const maxType = Object.keys(scores).reduce((a,b)=> scores[a] > scores[b] ? a : b);
+  const type = computeResultType();
+  const r = archetypes[type];
 
   const payload = {
     action: "submit",
@@ -186,21 +276,29 @@ window.submitForm = async function submitForm() {
       school: $("inp-school").value.trim(),
       phone: $("inp-phone").value.trim(),
       email: $("inp-email").value.trim(),
-      result: archetypes[maxType].title,
+
+      // save richer result too
+      resultType: type,
+      resultTH: r.thTitle,
+      resultEN: r.enName,
+
       lineUserId,
-      q1: userAnswers[0] || "", q2: userAnswers[1] || "", q3: userAnswers[2] || "", q4: userAnswers[3] || "", q5: userAnswers[4] || ""
+
+      q1: userAnswers[0] || "",
+      q2: userAnswers[1] || "",
+      q3: userAnswers[2] || "",
+      q4: userAnswers[3] || "",
+      q5: userAnswers[4] || ""
     }
   };
 
   try {
-    // ส่งแบบ text/plain ลด preflight/CORS issues
     const res = await fetch(GAS_WEBAPP_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
-    // ถ้าอ่าน JSON ไม่ได้ (บางสภาพแวดล้อม) ก็ถือว่าส่งสำเร็จหากไม่ throw
     let out = null;
     try { out = await res.json(); } catch (_) {}
 

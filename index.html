@@ -175,30 +175,28 @@
       box-shadow:0 6px 18px -14px rgba(2,132,199,.25);
       text-align:left;
     }
-    .result-title{
-      font-size:1.6rem;
-      font-weight:800;
-      color:#0f172a;
-      line-height:1.25;
-    }
-    .result-subtitle{
-      font-size:1.1rem;
-      font-weight:700;
-      color:#0d9488;
-    }
     .result-paragraph{
       font-size:1.05rem;
       color:#475569;
       line-height:1.7;
     }
-    .pill{
-      display:inline-flex;
-      align-items:center;
-      gap:.5rem;
-      padding:10px 12px;
-      border-radius:14px;
+
+    /* Secondary button */
+    .btn-secondary{
+      background:#ffffff;
+      border:2px solid rgba(13,148,136,.25);
+      color:#0f766e;
+      font-size:1.125rem;
       font-weight:800;
+      padding:16px 20px;
+      border-radius:16px;
+      width:100%;
+      text-align:center;
+      transition:all .2s ease;
+      box-shadow:0 8px 20px -14px rgba(15,118,110,.35);
+      cursor:pointer;
     }
+    .btn-secondary:active{transform:scale(.98)}
   </style>
 </head>
 
@@ -233,7 +231,6 @@
           </p>
         </div>
 
-        <!-- Status Indicator -->
         <div class="w-full px-6 space-y-4">
           <div id="liff-status" class="text-teal-700 bg-teal-50 py-2 px-4 rounded-xl flex items-center justify-center gap-2 border border-teal-100">
             <span class="loader !border-teal-200 !border-t-teal-600 !w-4 !h-4"></span>
@@ -243,16 +240,15 @@
           <button id="btn-start" onclick="startQuiz()" class="btn-primary transform hover:-translate-y-1" disabled>
             เริ่มค้นหาตัวตน 🚀
           </button>
-
-          <!-- Optional debug -->
-          <!-- <pre id="debug-info" class="mt-2 text-left whitespace-pre-wrap break-words text-xs text-slate-400"></pre> -->
         </div>
       </div>
 
       <!-- STEP 2: Quiz -->
       <div id="view-quiz" class="hidden slide-up h-full flex flex-col">
         <div class="flex justify-between items-center mb-8">
-          <span class="text-sm font-bold text-teal-700 bg-teal-50 px-3 py-1 rounded-lg border border-teal-100">ข้อที่ <span id="q-num">1</span>/5</span>
+          <span class="text-sm font-bold text-teal-700 bg-teal-50 px-3 py-1 rounded-lg border border-teal-100">
+            ข้อที่ <span id="q-num">1</span>/5
+          </span>
           <div class="w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
             <div id="progress-bar" class="h-full bg-teal-500 transition-all duration-500 ease-out" style="width:20%"></div>
           </div>
@@ -262,10 +258,10 @@
         <div id="q-answers" class="space-y-3 pb-6"></div>
       </div>
 
-      <!-- STEP 3: Result & Form -->
+      <!-- STEP 3: Result -->
       <div id="view-result" class="hidden slide-up">
 
-        <!-- Result Section (RICH) -->
+        <!-- Result Section -->
         <div class="text-center mb-6 bg-gradient-to-b from-white to-teal-50 p-6 rounded-2xl border border-teal-100 shadow-sm">
           <div class="inline-block relative mb-3">
             <div class="absolute inset-0 bg-yellow-200 rounded-full blur-xl opacity-50"></div>
@@ -300,23 +296,29 @@
           </div>
         </div>
 
-        <!-- Registration Form -->
-        <div>
-          <h3 class="text-base font-bold text-teal-800 mb-4 flex items-center gap-2 px-1">
-            <span class="bg-teal-100 text-teal-700 p-1 rounded-md">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
-              </svg>
-            </span>
-            ลงทะเบียนรับเกียรติบัตร
+        <!-- ✅ NEW: Buttons Panel -->
+        <div id="result-actions" class="space-y-3 pb-4">
+          <button type="button" class="btn-secondary" onclick="restartQuiz()">
+            🔁 เล่นใหม่อีกครั้ง
+          </button>
+
+          <button type="button" class="btn-primary" onclick="openCertificateForm()">
+            🏆 รับเกียรติบัตร
+          </button>
+        </div>
+
+        <!-- ✅ NEW: Certificate Form (Hidden until click) -->
+        <div id="certificate-form" class="hidden">
+          <h3 class="font-heading text-xl font-extrabold text-teal-900 mb-4 px-1">
+            กรอกข้อมูลของคุณ
           </h3>
 
           <form id="regis-form" onsubmit="event.preventDefault(); submitForm();" class="space-y-4">
             <input type="text" id="inp-name" required class="input-field" placeholder="ชื่อ-นามสกุล (ภาษาไทย) *">
 
             <div class="grid grid-cols-2 gap-3">
-              <select id="inp-grade" required class="input-field appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230d9488%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:12px] bg-[right_1rem_center]">
+              <select id="inp-grade" required
+                class="input-field appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%230d9488%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E')] bg-no-repeat bg-[length:12px] bg-[right_1rem_center]">
                 <option value="">ระดับชั้น *</option>
                 <option value="ม.1">ม.1</option>
                 <option value="ม.2">ม.2</option>
@@ -336,9 +338,13 @@
               <input type="email" id="inp-email" required class="input-field" placeholder="อีเมล *">
             </div>
 
-            <div class="pt-6 pb-8">
+            <div class="pt-4 pb-8 space-y-3">
               <button type="submit" id="btn-submit" class="btn-primary shadow-lg text-lg">
                 ยืนยันข้อมูล
+              </button>
+
+              <button type="button" class="btn-secondary" onclick="closeCertificateForm()">
+                ← กลับไปดูผลลัพธ์
               </button>
             </div>
           </form>

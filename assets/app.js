@@ -1,7 +1,7 @@
 // web/assets/app.js
 const { LIFF_ID, GAS_WEBAPP_URL, OA_URL } = window.APP_CONFIG;
 
-let lineUserId = "";     // will stay "" in guest mode
+let lineUserId = "";      // stays "" in guest mode
 let lineDisplayName = ""; // optional
 let currentQ = 0;
 let scores = { SCIENTIST: 0, DATA: 0, HEALER: 0, CREATIVE: 0 };
@@ -89,12 +89,7 @@ function setStatus(ok, html) {
   statusDiv.innerHTML = html;
 }
 
-/**
- * ✅ KEY CHANGE:
- * - init LIFF if possible
- * - DO NOT call liff.login() at all
- * - If logged in, use profile; else guest mode
- */
+// ✅ Never force login
 window.addEventListener("load", async () => {
   const startBtn = $("btn-start");
 
@@ -105,7 +100,6 @@ window.addEventListener("load", async () => {
     }
   }, 8000);
 
-  // If LIFF SDK not loaded -> guest mode
   if (typeof liff === "undefined") {
     clearTimeout(fallbackTimer);
     setStatus(false, "👤 โหมดบุคคลทั่วไป (เข้าเล่นได้เลย)");
@@ -118,27 +112,22 @@ window.addEventListener("load", async () => {
     await liff.ready;
     clearTimeout(fallbackTimer);
 
-    // If user is already logged in -> get profile (no forcing)
     if (liff.isLoggedIn && liff.isLoggedIn()) {
       const profile = await liff.getProfile();
       lineUserId = profile?.userId || "";
       lineDisplayName = profile?.displayName || "";
-
       setStatus(true, `✅ ยินดีต้อนรับคุณ ${lineDisplayName || "ครับ"} ✨`);
 
-      // email only if scope email enabled AND user is logged in
       const token = liff.getDecodedIDToken?.();
       const email = token?.email;
       if (email && $("inp-email") && !$("inp-email").value) $("inp-email").value = email;
     } else {
-      // Not logged in -> guest mode
       setStatus(false, "👤 โหมดบุคคลทั่วไป (เข้าเล่นได้เลย)");
     }
 
     startBtn.disabled = false;
     startBtn.classList.add("pulse-slow");
   } catch (err) {
-    // Any LIFF error -> guest mode
     clearTimeout(fallbackTimer);
     setStatus(false, "👤 โหมดบุคคลทั่วไป (เข้าเล่นได้เลย)");
     startBtn.disabled = false;
@@ -153,6 +142,8 @@ function switchView(fromId, toId) {
 }
 
 window.startQuiz = function startQuiz() {
+  // ensure form hidden when starting
+  hideCertificateForm(true);
   switchView("view-landing", "view-quiz");
   renderQuestion();
 };
@@ -210,8 +201,66 @@ function setResultUI(type) {
 function showResult() {
   const type = computeResultType();
   setResultUI(type);
+
+  // ✅ show actions, hide form by default
+  hideCertificateForm(true);
+
   switchView("view-quiz", "view-result");
 }
+
+/* ===========================
+   ✅ NEW: Result actions logic
+   =========================== */
+
+function resetQuizState() {
+  currentQ = 0;
+  scores = { SCIENTIST: 0, DATA: 0, HEALER: 0, CREATIVE: 0 };
+  userAnswers = [];
+
+  // clear form (optional but nice)
+  const ids = ["inp-name", "inp-grade", "inp-province", "inp-school", "inp-phone", "inp-email"];
+  ids.forEach(id => { const el = $(id); if (el) el.value = ""; });
+}
+
+window.restartQuiz = function restartQuiz() {
+  resetQuizState();
+  hideCertificateForm(true);
+  switchView("view-result", "view-quiz");
+  renderQuestion();
+};
+
+function hideCertificateForm(hide) {
+  const panel = $("result-actions");
+  const formWrap = $("certificate-form");
+  if (!panel || !formWrap) return;
+
+  if (hide) {
+    panel.classList.remove("hidden");
+    formWrap.classList.add("hidden");
+  } else {
+    panel.classList.add("hidden");
+    formWrap.classList.remove("hidden");
+  }
+}
+
+window.openCertificateForm = function openCertificateForm() {
+  hideCertificateForm(false);
+  // scroll to form nicely
+  setTimeout(() => {
+    $("main-scroll").scrollTo({ top: $("certificate-form").offsetTop - 8, behavior: "smooth" });
+  }, 50);
+};
+
+window.closeCertificateForm = function closeCertificateForm() {
+  hideCertificateForm(true);
+  setTimeout(() => {
+    $("main-scroll").scrollTo({ top: 0, behavior: "smooth" });
+  }, 50);
+};
+
+/* ===========================
+   ✅ Submit (old logic kept)
+   =========================== */
 
 window.submitForm = async function submitForm() {
   const btn = $("btn-submit");
@@ -236,14 +285,13 @@ window.submitForm = async function submitForm() {
       resultTH: r.thTitle,
       resultEN: r.enName,
 
-      // ✅ will be "" in guest mode
-      lineUserId,
+      lineUserId, // "" for guest
 
       q1: userAnswers[0] || "",
       q2: userAnswers[1] || "",
       q3: userAnswers[2] || "",
       q4: userAnswers[3] || "",
-      q5: userAnswers[4] || ""
+      q5: userAnswers[4] || "",
     }
   };
 

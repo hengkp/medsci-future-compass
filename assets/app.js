@@ -66,7 +66,7 @@ window.addEventListener("load", async () => {
   const startBtn = $("btn-start");
   const fallbackTimer = setTimeout(() => {
     if (startBtn.disabled) {
-      setStatus(false, "👤 โหมดบุคคลทั่วไป (LIFF init timeout)");
+      setStatus(false, "👤 โหมดบุคคลทั่วไป");
       startBtn.disabled = false;
       showDebug({ reason:"timeout", href: location.href, ua: navigator.userAgent });
     }
@@ -74,7 +74,7 @@ window.addEventListener("load", async () => {
 
   if (typeof liff === "undefined") {
     clearTimeout(fallbackTimer);
-    setStatus(false, "👤 โหมดบุคคลทั่วไป (No LIFF SDK)");
+    setStatus(false, "👤 โหมดบุคคลทั่วไป");
     startBtn.disabled = false;
     showDebug({ reason:"liff undefined", href: location.href });
     return;
@@ -86,12 +86,21 @@ window.addEventListener("load", async () => {
     await liff.ready;
     clearTimeout(fallbackTimer);
 
+    const inLineClient = liff.isInClient();
+
     if (!liff.isLoggedIn()) {
-      setStatus(false, `<span class="loader !w-4 !h-4"></span> กำลังยืนยันตัวตน...`);
-      // redirect กลับหน้าปัจจุบัน (ไม่มี #fragment)
-      const cleanHref = location.origin + location.pathname + location.search;
-      liff.login({ redirectUri: cleanHref });
-      return;
+      if (inLineClient) {
+        // อยู่ในแอป LINE → login ได้ (เพื่อเอา userId)
+        setStatus(false, `<span class="loader !w-4 !h-4"></span> กำลังยืนยันตัวตน...`);
+        liff.login({ redirectUri: cleanHref() });
+        return; // จะ redirect กลับมาเอง
+      } else {
+        // อยู่นอก LINE → ไม่บังคับ login (Guest mode)
+        setStatus(false, "👤 โหมดบุคคลทั่วไป");
+        document.getElementById("btn-start").disabled = false;
+        showDebug({ guest: true, reason: "external browser - skip login", href: location.href });
+        return;
+      }
     }
 
     const profile = await liff.getProfile();
@@ -109,7 +118,7 @@ window.addEventListener("load", async () => {
     showDebug({ ok:true, isInClient:liff.isInClient(), os:liff.getOS?.(), href:location.href, userId: lineUserId });
   } catch (err) {
     clearTimeout(fallbackTimer);
-    setStatus(false, "👤 โหมดบุคคลทั่วไป (LIFF init failed)");
+    setStatus(false, "👤 โหมดบุคคลทั่วไป");
     startBtn.disabled = false;
     showDebug({ ok:false, error:{ name:err?.name, message:err?.message, code:err?.code }, href:location.href });
   }

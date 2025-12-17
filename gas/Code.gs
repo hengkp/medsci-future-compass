@@ -1,17 +1,33 @@
-function doGet() {
-  return ContentService.createTextOutput("OK The Future Compass WebApp").setMimeType(ContentService.MimeType.TEXT);
+/**
+ * The Future Compass - Backend (Google Apps Script Web App)
+ * Requires Script Properties:
+ * - SHEET_ID (required)
+ * - LINE_CHANNEL_ACCESS_TOKEN (optional; required only if you want OA push)
+ */
+
+const SHEET_NAME = "Sheet1";
+
+/* =========================
+ * Entry points
+ * ========================= */
+function doGet(e) {
+  // Quick verify the webapp is alive
+  return ContentService
+    .createTextOutput("OK The Future Compass WebApp")
+    .setMimeType(ContentService.MimeType.TEXT);
 }
 
 function doPost(e) {
   try {
     const body = JSON.parse((e.postData && e.postData.contents) || "{}");
-    const action = body.action;
+    const action = String(body.action || "").trim();
     const data = body.data || {};
 
+    if (!action) return json_({ status: "error", message: "Missing action" });
+
     if (action === "health") {
-      // test sheet access
-      getSheet_();
-      return json_({ status: "ok", now: new Date().toISOString() });
+      const report = healthCheck_();
+      return json_({ status: "ok", report, now: new Date().toISOString() });
     }
 
     if (action === "reserve_session") {
@@ -28,50 +44,122 @@ function doPost(e) {
     if (action === "quiz_complete") {
       const used = appendQuizRow_(data);
 
-      // ส่งข้อความจาก OA (ไม่ทำให้บันทึกชีท fail)
-      try { sendResultViaOA_(data, used); } catch (err) { console.log("OA send failed:", err); }
+      // OA push: do NOT break sheet logging
+      try {
+        sendResultViaOA_(data, used);
+      } catch (err) {
+        console.log("OA send failed:", err);
+      }
 
       return json_({ status: "ok", sessionCode: used });
     }
 
     if (action === "certificate_click") {
       const used = markCertificateClick_(data);
-      // (optional) ส่งข้อความขอบคุณ/แนบลิงก์ฟอร์มได้ ถ้าต้องการ
       return json_({ status: "ok", sessionCode: used });
     }
 
     return json_({ status: "error", message: "Unknown action: " + action });
   } catch (err) {
-    return json_({ status: "error", message: String(err && err.message ? err.message : err) });
+    return json_({ status: "error", message: asErrMsg_(err) });
   }
 }
 
-/* ====== CONFIG ====== */
-const SHEET_ID = "1sDXwbmV10B-mFlxRsojwRshByOKfhhkpPwlK4twzGxU";
-const SHEET_NAME = "Sheet1";
+/* =========================
+ * Properties helpers
+ * ========================= */
+function getRequiredProp_(key) {
+  const v = PropertiesService.getScriptProperties().getProperty(key);
+  const s = String(v || "").trim();
+  if (!s) throw new Error(`Missing Script Property: ${key}`);
+  return s;
+}
 
-/* ====== SHEET ====== */
+function getOptionalProp_(key) {
+  const v = PropertiesService.getScriptProperties().getProperty(key);
+  const s = String(v || "").trim();
+  return s || "";
+}
+
+/* =========================
+ * Health check / Setup
+ * ========================= */
+function healthCheck_() {
+  const report = {
+    sheetIdPresent: false,
+    sheetOpenOk: false,
+    sheetName: SHEET_NAME,
+    headerOk: false,
+    lineTokenPresent: false,
+    errors: []
+  };
+
+  // Check sheet property
+  try {
+    const sheetId = getRequiredProp_("SHEET_ID");
+    report.sheetIdPresent = true;
+
+    const ss = SpreadsheetApp.openById(sheetId);
+    report.sheetOpenOk = true;
+
+    const sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+    ensureHeader_(sh);
+    report.headerOk = true;
+  } catch (e) {
+    report.errors.push("Sheet error: " + asErrMsg_(e));
+  }
+
+  // Token is optional
+  try {
+    const token = getOptionalProp_("LINE_CHANNEL_ACCESS_TOKEN");
+    report.lineTokenPresent = !!token;
+  } catch (e) {
+    report.errors.push("Token error: " + asErrMsg_(e));
+  }
+
+  return report;
+}
+
+/**
+ * Run manually once if you want:
+ * - creates header
+ * - prints a health report in logs
+ */
+function setUp_() {
+  const r = healthCheck_();
+  console.log(JSON.stringify(r, null, 2));
+}
+
+/* =========================
+ * Sheet helpers
+ * ========================= */
 function getSheet_() {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheetId = getRequiredProp_("SHEET_ID"); // required
+  const ss = SpreadsheetApp.openById(sheetId);
   const sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+  ensureHeader_(sh);
+  return sh;
+}
 
+function ensureHeader_(sh) {
   if (sh.getLastRow() === 0) {
     sh.appendRow([
       "tsServer",
       "sessionCode",
       "certificateClick",
       "certificateClickAt",
-      "name","age","gender",
-      "a1","a2","a3","a4","a5",
-      "resultType","resultTH","resultEN",
+      "name", "age", "gender",
+      "a1", "a2", "a3", "a4", "a5",
+      "resultType", "resultTH", "resultEN",
       "userId",
-      "profileJson","liffJson","clientJson","answersJson"
+      "profileJson", "liffJson", "clientJson", "answersJson"
     ]);
   }
-  return sh;
 }
 
-/* ====== SESSION UNIQUE ====== */
+/* =========================
+ * Session unique
+ * ========================= */
 function genSessionCode_() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
@@ -80,30 +168,48 @@ function genSessionCode_() {
 }
 
 function sessionExists_(code) {
+  const key = ("tfc_sess_" + code).toLowerCase();
+  const cache = CacheService.getScriptCache();
+  const cached = cache.get(key);
+  if (cached === "1") return true;
+
   const sh = getSheet_();
   const lastRow = sh.getLastRow();
   if (lastRow < 2) return false;
 
+  // sessionCode is column 2
   const rng = sh.getRange(2, 2, lastRow - 1, 1);
   const found = rng.createTextFinder(code).matchEntireCell(true).findNext();
-  return !!found;
+  const exists = !!found;
+
+  if (exists) cache.put(key, "1", 60 * 60); // 1 hour cache
+  return exists;
 }
 
 function reserveSessionCode_() {
   const lock = LockService.getScriptLock();
   lock.waitLock(8000);
   try {
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 60; i++) {
       const code = genSessionCode_();
-      if (!sessionExists_(code)) return code;
+      if (!sessionExists_(code)) {
+        // cache it to reduce repeated scans
+        CacheService.getScriptCache().put(("tfc_sess_" + code).toLowerCase(), "1", 60 * 60);
+        return code;
+      }
     }
-    return "X" + String(new Date().getTime()).slice(-4);
+    // fallback very low collision
+    const fallback = "X" + String(Date.now()).slice(-4);
+    CacheService.getScriptCache().put(("tfc_sess_" + fallback).toLowerCase(), "1", 60 * 60);
+    return fallback;
   } finally {
     lock.releaseLock();
   }
 }
 
-/* ====== APPEND QUIZ ====== */
+/* =========================
+ * Append quiz
+ * ========================= */
 function appendQuizRow_(d) {
   const lock = LockService.getScriptLock();
   lock.waitLock(8000);
@@ -141,13 +247,17 @@ function appendQuizRow_(d) {
       JSON.stringify(d.answers || [])
     ]);
 
+    // cache as existing
+    CacheService.getScriptCache().put(("tfc_sess_" + code).toLowerCase(), "1", 60 * 60);
     return code;
   } finally {
     lock.releaseLock();
   }
 }
 
-/* ====== CERT CLICK ====== */
+/* =========================
+ * Certificate click mark
+ * ========================= */
 function markCertificateClick_(d) {
   const code = String(d.sessionCode || "").trim();
   if (!code) throw new Error("Missing sessionCode");
@@ -166,7 +276,10 @@ function markCertificateClick_(d) {
     const values = sh.getRange(2, colSession, lastRow - 1, 1).getValues();
     let foundRow = -1;
     for (let i = values.length - 1; i >= 0; i--) {
-      if (String(values[i][0]).trim() === code) { foundRow = i + 2; break; }
+      if (String(values[i][0]).trim() === code) {
+        foundRow = i + 2;
+        break;
+      }
     }
     if (foundRow === -1) throw new Error("sessionCode not found: " + code);
 
@@ -178,17 +291,24 @@ function markCertificateClick_(d) {
   }
 }
 
-/* ====== OA PUSH MESSAGE (Channel Access Token) ====== */
+/* =========================
+ * OA Push Message (Channel Access Token)
+ * ========================= */
 function getLineToken_() {
-  const token = PropertiesService.getScriptProperties().getProperty("LINE_CHANNEL_ACCESS_TOKEN");
-  if (!token) throw new Error("Missing Script Property: LINE_CHANNEL_ACCESS_TOKEN");
+  const token = getOptionalProp_("LINE_CHANNEL_ACCESS_TOKEN"); // optional
+  if (!token) return ""; // allow sheet logging even without token
   return token;
 }
 
 function sendResultViaOA_(d, sessionCode) {
+  const token = getLineToken_();
+  if (!token) {
+    console.log("No LINE_CHANNEL_ACCESS_TOKEN; skip OA push");
+    return;
+  }
+
   const userId = String(d.userId || "").trim();
   if (!userId) {
-    // ถ้าไม่ได้มาจาก LIFF ที่ login จะไม่มี userId -> ส่งไม่ได้
     console.log("No userId; skip OA push");
     return;
   }
@@ -200,13 +320,13 @@ function sendResultViaOA_(d, sessionCode) {
 
   const msgFlex = buildResultFlex_(name, resultTH, resultEN, emoji, sessionCode);
 
-  pushLine_(userId, [
+  pushLine_(token, userId, [
     msgFlex,
     {
       type: "text",
       text:
-        `ถ้าอยากรับเกียรติบัตร 🏆\n` +
-        `กลับไปที่หน้าเกม แล้วกดปุ่ม “รับเกียรติบัตร” ได้เลยนะครับ 🙂`
+        `ขอบคุณที่ร่วมสนุกนะครับ 😊\n` +
+        `ถ้าอยากรับเกียรติบัตร 🏆 ให้กลับไปที่หน้าเกม แล้วกดปุ่ม “รับเกียรติบัตร” ได้เลยครับ`
     }
   ]);
 }
@@ -234,18 +354,8 @@ function buildResultFlex_(name, resultTH, resultEN, emoji, sessionCode) {
         layout: "vertical",
         spacing: "md",
         contents: [
-          {
-            type: "text",
-            text: "The Future Compass 🧭",
-            weight: "bold",
-            size: "lg"
-          },
-          {
-            type: "text",
-            text: `สวัสดี ${name} 😊`,
-            size: "md",
-            wrap: true
-          },
+          { type: "text", text: "The Future Compass 🧭", weight: "bold", size: "lg" },
+          { type: "text", text: `สวัสดี ${name} 😊`, size: "md", wrap: true },
           {
             type: "box",
             layout: "baseline",
@@ -255,13 +365,9 @@ function buildResultFlex_(name, resultTH, resultEN, emoji, sessionCode) {
               { type: "text", text: resultTH, weight: "bold", size: "xl", wrap: true }
             ]
           },
-          resultEN ? {
-            type: "text",
-            text: resultEN,
-            size: "sm",
-            color: "#64748b",
-            wrap: true
-          } : { type: "spacer", size: "xs" },
+          resultEN
+            ? { type: "text", text: resultEN, size: "sm", color: "#64748b", wrap: true }
+            : { type: "spacer", size: "xs" },
           {
             type: "box",
             layout: "vertical",
@@ -277,10 +383,8 @@ function buildResultFlex_(name, resultTH, resultEN, emoji, sessionCode) {
   };
 }
 
-function pushLine_(to, messages) {
-  const token = getLineToken_();
+function pushLine_(token, to, messages) {
   const url = "https://api.line.me/v2/bot/message/push";
-
   const payload = JSON.stringify({ to, messages });
 
   const res = UrlFetchApp.fetch(url, {
@@ -297,7 +401,21 @@ function pushLine_(to, messages) {
   }
 }
 
+/* =========================
+ * Utils
+ * ========================= */
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function asErrMsg_(err) {
+  try {
+    if (!err) return "Unknown error";
+    if (typeof err === "string") return err;
+    if (err.message) return err.message;
+    return JSON.stringify(err);
+  } catch (e) {
+    return "Unknown error";
+  }
 }

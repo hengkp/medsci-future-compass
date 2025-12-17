@@ -1,7 +1,7 @@
 // web/assets/config.js
 window.APP_CONFIG = {
   LIFF_ID: "2008690429-5QiQHOUA",
-  GAS_WEBAPP_URL: "https://script.google.com/macros/s/AKfycbwX1cdUQhG9KCL9d7sOLlO_qXzZXeusejCs1de6TPHrGl8YTYPvA2neXNMr6MXmAEWfJw/exec",
+  GAS_WEBAPP_URL: "https://script.google.com/macros/s/AKfycbzqQze1EsPpXgBiU54j7FsDD6YyW0-FjibG9ZjYXWynxswP5GnngrdxKLVdVs8BJiOXZg/exec",
   OA_URL: "https://lin.ee/AeZIqWe",
 
   // ✅ ใส่ลิงก์ Google Forms สำหรับรับเกียรติบัตร

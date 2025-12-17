@@ -332,7 +332,7 @@ async function sendResultMessageOnce_(name, resultTH) {
     const text =
       `สวัสดี ${safeName} 👋\n` +
       `ขอบคุณที่ร่วมสนุกกับ "The Future Compass 🧭"\n` +
-      `ผลลัพธ์ของคุณคือ: "${resultTH}" ✨;
+      `ผลลัพธ์ของคุณคือ: "${resultTH}" ✨`;
 
     await liff.sendMessages([{ type: "text", text }]);
   } catch (_) {

@@ -39,14 +39,14 @@ function doPost(e) {
       data.province || "",
       data.phone || "",
       data.email || "",
-      data.result || "",
+      data.resultTH || "",
       data.lineUserId || "",
       data.q1 || "", data.q2 || "", data.q3 || "", data.q4 || "", data.q5 || ""
     ]);
 
     // ส่งข้อความขอบคุณ (ถ้ามี token + userId)
     if (LINE_CHANNEL_ACCESS_TOKEN && data.lineUserId) {
-      sendLineThankYouMessage_(LINE_CHANNEL_ACCESS_TOKEN, data.lineUserId, data.name || "", data.result || "");
+      sendLineThankYouMessage_(LINE_CHANNEL_ACCESS_TOKEN, data.lineUserId, data.name || "", data.resultTH || "");
     }
 
     return json_({ status: "success" });

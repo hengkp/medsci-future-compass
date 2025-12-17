@@ -13,6 +13,29 @@ let lastResultTH = "";
 let lastResultEN = "";
 let sentResultMessage = false; // กันส่งซ้ำ
 
+const SESSION_KEY = "tfc_session_code";
+
+function genSessionCode_() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // avoid confusing I/O/1/0
+  let s = "";
+  for (let i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+function getSessionCode_() {
+  try {
+    let code = sessionStorage.getItem(SESSION_KEY);
+    if (!code) {
+      code = genSessionCode_();
+      sessionStorage.setItem(SESSION_KEY, code);
+    }
+    return code;
+  } catch (_) {
+    // fallback if sessionStorage blocked
+    return genSessionCode_();
+  }
+}
+
 function $(id){ return document.getElementById(id); }
 
 function switchView(fromId, toId) {
@@ -259,6 +282,7 @@ function renderQuestion_() {
 
 async function onQuizCompleted_() {
   const { name, age, gender } = getLandingData_();
+  const sessionCode = getSessionCode_();
 
   const type = computeResultType();
   const r = archetypes[type];
@@ -269,23 +293,25 @@ async function onQuizCompleted_() {
   setResultUI(type);
   switchView("view-quiz", "view-result");
 
-  // ✅ 1) บันทึกลงชีท (วันเวลา/ชื่อ/อายุ/เพศ/คำตอบ/ผล/โปรไฟล์)
   try {
     await callBackend_("quiz_complete", {
+      sessionCode,
+      certificateClick: 0,
+
       name, age, gender,
       answers: userAnswers.slice(0),
       resultType: lastResultType,
       resultTH: lastResultTH,
       resultEN: lastResultEN,
       liffInfo: { ...liffInfo },
-      profile: lineProfile || null, // getProfile "ทั้งหมด"
+      profile: lineProfile || null,
       client: buildClientMeta(),
     });
-  } catch (_) {
-    // ไม่บังคับให้ fail เพราะต้องให้ดูผลได้
+  } catch (e) {
+    console.error("quiz_complete failed:", e);
+    alert("บันทึกลงชีทไม่สำเร็จ: " + (e?.message || e));
   }
 
-  // ✅ 2) ส่งข้อความเข้าแชท "เพียง 1 ข้อความ" หลังได้ผลลัพธ์
   await sendResultMessageOnce_(name, lastResultTH);
 }
 
@@ -306,8 +332,7 @@ async function sendResultMessageOnce_(name, resultTH) {
     const text =
       `สวัสดี ${safeName} 👋\n` +
       `ขอบคุณที่ร่วมสนุกกับ "The Future Compass 🧭"\n` +
-      `ผลลัพธ์ของคุณคือ: "${resultTH}" ✨\n` +
-      `แวะรับเกียรติบัตรได้เลยนะครับ 🏆`;
+      `ผลลัพธ์ของคุณคือ: "${resultTH}" ✨;
 
     await liff.sendMessages([{ type: "text", text }]);
   } catch (_) {
@@ -362,14 +387,32 @@ window.goOA = function goOA() {
 };
 
 
-window.openCertificateFormExternal = function openCertificateFormExternal() {
-  // เปิดแบบ external เสมอ (ไม่ต้องกรอกใน UI นี้)
+window.openCertificateFormExternal = async function openCertificateFormExternal() {
+  const { name, age, gender } = getLandingData_();
+  const sessionCode = getSessionCode_();
+
+  try {
+    await callBackend_("certificate_click", {
+      sessionCode,
+      certificateClick: 1,
+      name, age, gender,
+      resultType: lastResultType,
+      resultTH: lastResultTH,
+      resultEN: lastResultEN,
+      liffInfo: { ...liffInfo },
+      profile: lineProfile || null,
+      client: buildClientMeta(),
+    });
+  } catch (e) {
+    console.error("certificate_click failed:", e);
+    // still open form even if logging fails
+  }
+
   try {
     if (typeof liff !== "undefined" && liff.openWindow) {
       liff.openWindow({ url: CERT_GOOGLE_FORM_URL, external: true });
       return;
     }
   } catch (_) {}
-
   window.open(CERT_GOOGLE_FORM_URL, "_blank");
 };

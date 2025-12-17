@@ -1,8 +1,9 @@
 // web/assets/config.js
 window.APP_CONFIG = {
   LIFF_ID: "2008690429-5QiQHOUA",
-  // ใส่ URL ของ Apps Script Web App (exec) หลังจาก Deploy แล้ว
-  GAS_WEBAPP_URL: "https://script.google.com/macros/s/AKfycbwnjTxxpd1xcAHlBHebrb-0KEBvtgMBa9jRabACpom7Igex8mMmqMXJsIq1TYx1uHt3/exec",
-  // ลิงก์ OA (เอาไว้ redirect ตอนอยู่นอก LINE)
+  GAS_WEBAPP_URL: "https://script.google.com/macros/s/AKfycbwX1cdUQhG9KCL9d7sOLlO_qXzZXeusejCs1de6TPHrGl8YTYPvA2neXNMr6MXmAEWfJw/exec",
   OA_URL: "https://lin.ee/7gdLJZ3",
+
+  // ✅ ใส่ลิงก์ Google Forms สำหรับรับเกียรติบัตร
+  CERT_GOOGLE_FORM_URL: "https://forms.gle/L2h6dS7urinphXke8"
 };

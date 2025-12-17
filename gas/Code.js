@@ -235,11 +235,16 @@ function sendResultViaOA_(d, rowNum) {
   const resultEN = d.resultEN || "";
   const emoji = pickEmojiByType_(d.resultType);
 
-  const msgFlex = buildResultFlex_(name, resultTH, resultEN, emoji, String(d.rowId || rowNum || ""));
+  const desc = (d && d.desc) ? String(d.desc) : "";
+  const tip  = (d && d.tip)  ? String(d.tip)  : "";
+  const jobs = (d && d.jobs) ? d.jobs : [];
+  const idText = String(d.rowId || "");
+
+  const msgFlex = buildResultFlex_(name, resultTH, resultEN, emoji, desc, tip, jobs, idText);
 
   pushLine_(token, userId, [
     msgFlex,
-    { type: "text", text: `ขอบคุณที่ร่วมสนุกนะครับ 😊\nถ้าอยากรับเกียรติบัตร 🏆 ให้กลับไปที่หน้าเกม แล้วกดปุ่ม “รับเกียรติบัตร” ได้เลยครับ` }
+    { type: "text", text: `ขอบคุณที่ร่วมสนุกนะครับ 😊` }
   ]);
 }
 
@@ -252,8 +257,17 @@ function pickEmojiByType_(type) {
   return "✨";
 }
 
-function buildResultFlex_(name, resultTH, resultEN, emoji, idText) {
-  const alt = `ผลลัพธ์ของคุณคือ: ${resultTH}`;
+function buildResultFlex_(name, resultTH, resultEN, emoji, desc, tip, jobs, idText) {
+  const alt = `The Future Compass บอกว่า คุณคือ ${resultTH}`;
+  const jobList = Array.isArray(jobs) ? jobs : [];
+  const safeName = name || "เพื่อนใหม่";
+  const safeEmoji = emoji || "✨";
+  const safeTH = resultTH || "-";
+  const safeEN = resultEN || "";
+  const safeDesc = desc || "";
+  const safeTip = tip || "";
+  const safeId = idText ? String(idText) : "";
+
   return {
     type: "flex",
     altText: alt,
@@ -264,21 +278,134 @@ function buildResultFlex_(name, resultTH, resultEN, emoji, idText) {
         type: "box",
         layout: "vertical",
         spacing: "md",
+        paddingAll: "20px",
+        backgroundColor: "#FFFFFF",
         contents: [
-          { type: "text", text: "The Future Compass 🧭", weight: "bold", size: "lg" },
-          { type: "text", text: `สวัสดี ${name} 😊`, size: "md", wrap: true },
-          { type: "text", text: "คุณคือ", size: "sm", weight: "bold", color: "#0f766e", wrap: true },
+          // Header
           {
             type: "box",
-            layout: "baseline",
+            layout: "vertical",
             spacing: "sm",
             contents: [
-              { type: "text", text: emoji, size: "xl", flex: 0 },
-              { type: "text", text: resultTH, weight: "bold", size: "xl", wrap: true }
+              { type: "text", text: "The Future Compass 🧭", weight: "bold", size: "lg", color: "#0f172a" },
+              { type: "text", text: `สวัสดี ${safeName} 😊`, size: "sm", color: "#475569", wrap: true }
             ]
           },
-          resultEN ? { type: "text", text: resultEN, size: "sm", color: "#64748b", wrap: true } : { type: "spacer", size: "xs" },
-          { type: "text", text: `ID: ${idText}`, size: "xs", color: "#94a3b8", wrap: true }
+
+          { type: "separator", margin: "md", color: "#E2E8F0" },
+
+          // Title
+          {
+            type: "text",
+            text: "The Future Compass บอกว่า คุณคือ",
+            size: "md",
+            weight: "bold",
+            color: "#0f766e",
+            wrap: true
+          },
+
+          // Result card
+          {
+            type: "box",
+            layout: "vertical",
+            spacing: "sm",
+            paddingAll: "16px",
+            cornerRadius: "16px",
+            backgroundColor: "#F0FDFA",
+            borderWidth: "1px",
+            borderColor: "#99F6E4",
+            contents: [
+              {
+                type: "box",
+                layout: "baseline",
+                spacing: "md",
+                contents: [
+                  { type: "text", text: safeEmoji, size: "xxl", flex: 0 },
+                  { type: "text", text: safeTH, weight: "bold", size: "xl", color: "#0f172a", wrap: true }
+                ]
+              },
+              safeEN
+                ? { type: "text", text: safeEN, size: "sm", color: "#0f766e", wrap: true }
+                : { type: "spacer", size: "xs" }
+            ]
+          },
+
+          // Desc card
+          safeDesc
+            ? {
+                type: "box",
+                layout: "vertical",
+                spacing: "xs",
+                paddingAll: "14px",
+                cornerRadius: "16px",
+                backgroundColor: "#FFFFFF",
+                borderWidth: "1px",
+                borderColor: "#E2E8F0",
+                contents: [
+                  { type: "text", text: "คำอธิบาย", weight: "bold", size: "sm", color: "#0f172a" },
+                  { type: "text", text: safeDesc, size: "sm", color: "#334155", wrap: true }
+                ]
+              }
+            : { type: "spacer", size: "xs" },
+
+          // Tip card (gold)
+          safeTip
+            ? {
+                type: "box",
+                layout: "vertical",
+                spacing: "xs",
+                paddingAll: "14px",
+                cornerRadius: "16px",
+                backgroundColor: "#FFFBEB",
+                borderWidth: "1px",
+                borderColor: "#FDE68A",
+                contents: [
+                  { type: "text", text: "คำแนะนำพัฒนาตนเอง ✨", weight: "bold", size: "sm", color: "#92400E" },
+                  { type: "text", text: safeTip, size: "sm", color: "#334155", wrap: true }
+                ]
+              }
+            : { type: "spacer", size: "xs" },
+
+          // Jobs card
+          {
+            type: "box",
+            layout: "vertical",
+            spacing: "xs",
+            paddingAll: "14px",
+            cornerRadius: "16px",
+            backgroundColor: "#EFF6FF",
+            borderWidth: "1px",
+            borderColor: "#BFDBFE",
+            contents: [
+              { type: "text", text: "อาชีพที่เหมาะกับคุณ 🎯", weight: "bold", size: "sm", color: "#1D4ED8" },
+              ...(jobList.length
+                ? jobList.slice(0, 8).map(j => ({
+                    type: "text",
+                    text: `• ${j}`,
+                    size: "sm",
+                    color: "#334155",
+                    wrap: true
+                  }))
+                : [{ type: "text", text: "• -", size: "sm", color: "#334155", wrap: true }])
+            ]
+          },
+
+          // Footer ID
+          safeId
+            ? {
+                type: "box",
+                layout: "vertical",
+                margin: "md",
+                paddingAll: "10px",
+                cornerRadius: "12px",
+                backgroundColor: "#F8FAFC",
+                borderWidth: "1px",
+                borderColor: "#E2E8F0",
+                contents: [
+                  { type: "text", text: `ID: ${safeId}`, size: "xs", color: "#64748B", wrap: true }
+                ]
+              }
+            : { type: "spacer", size: "xs" }
         ]
       }
     }

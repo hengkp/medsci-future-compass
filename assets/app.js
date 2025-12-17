@@ -291,10 +291,17 @@ function onQuizCompleted_() {
     resultType: lastResultType,
     resultTH: lastResultTH,
     resultEN: lastResultEN,
+
+    // ✅ เพิ่ม 2 อันนี้
+    desc: r.desc,
+    tip:  r.tip,
+    jobs: r.jobs,
+
     userId: String(lineProfile?.userId || ""),
     profile: lineProfile || null,
     liffInfo: { ...liffInfo },
     client: buildClientMeta(),
+
   }, { timeoutMs: 6000 });
 }
 

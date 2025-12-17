@@ -1,8 +1,7 @@
-// web/assets/app.js
 const { LIFF_ID, GAS_WEBAPP_URL, OA_URL, CERT_GOOGLE_FORM_URL } = window.APP_CONFIG;
 
 let liffInfo = { os:"", lang:"", version:"", isInClient:false, isLoggedIn:false };
-let lineProfile = null; // เก็บ getProfile "ทั้งหมด"วัตถุ
+let lineProfile = null;
 
 let currentQ = 0;
 let scores = { SCIENTIST: 0, DATA: 0, HEALER: 0, CREATIVE: 0 };
@@ -11,30 +10,9 @@ let userAnswers = [];
 let lastResultType = "";
 let lastResultTH = "";
 let lastResultEN = "";
-let sentResultMessage = false; // กันส่งซ้ำ
+let sentResultMessage = false;
 
 const SESSION_KEY = "tfc_session_code";
-
-function genSessionCode_() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // avoid confusing I/O/1/0
-  let s = "";
-  for (let i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s;
-}
-
-function getSessionCode_() {
-  try {
-    let code = sessionStorage.getItem(SESSION_KEY);
-    if (!code) {
-      code = genSessionCode_();
-      sessionStorage.setItem(SESSION_KEY, code);
-    }
-    return code;
-  } catch (_) {
-    // fallback if sessionStorage blocked
-    return genSessionCode_();
-  }
-}
 
 function $(id){ return document.getElementById(id); }
 
@@ -52,9 +30,7 @@ function setStatus(ok, html) {
   statusDiv.innerHTML = html;
 }
 
-function safeNowISO() {
-  try { return new Date().toISOString(); } catch { return ""; }
-}
+function safeNowISO(){ try { return new Date().toISOString(); } catch { return ""; } }
 
 function buildClientMeta() {
   return {
@@ -65,9 +41,9 @@ function buildClientMeta() {
   };
 }
 
-// =====================
-// Questions = 5 ข้อเท่านั้น
-// =====================
+/* =====================
+   Questions (5 only)
+   ===================== */
 const questions = [
   { q: "1. ถ้าโลกถูกไวรัสปริศนาโจมตี น้องจะรับบทบาทไหน?", answers: [
     { text: "วิจัยหาวัคซีนในห้องแล็บ", type: "SCIENTIST" },
@@ -103,36 +79,28 @@ const questions = [
 
 const archetypes = {
   HEALER: {
-    thTitle: "ผู้เยียวยาสังคม",
-    enName: "The Social Healer",
-    icon: "❤️",
+    thTitle: "ผู้เยียวยาสังคม", enName: "The Social Healer", icon: "❤️",
     desc: "หัวใจของคุณคือผู้ให้! มีความเห็นอกเห็นใจผู้อื่น และชอบทำงานที่ได้ช่วยเหลือผู้คนโดยตรง",
     tip: "ทักษะการสื่อสารและจิตวิทยาเป็นอาวุธสำคัญของคุณ พัฒนามันให้ดีเยี่ยม",
     jobs: ["บุคลากรทางการแพทย์", "นักสาธารณสุข", "เจ้าหน้าที่ควบคุมคุณภาพบริการ"],
     wow: false,
   },
   DATA: {
-    thTitle: "พ่อมดแห่งข้อมูล",
-    enName: "The Data Wizard",
-    icon: "💻",
+    thTitle: "พ่อมดแห่งข้อมูล", enName: "The Data Wizard", icon: "💻",
     desc: "คุณมองเห็นรูปแบบที่คนอื่นมองไม่เห็น! ชอบใช้ตรรกะและตัวเลขในการไขปัญหาซับซ้อน",
     tip: "ลองศึกษาเรื่อง AI หรือการเขียนโปรแกรมเบื้องต้น จะช่วยติดปีกให้ความฝันคุณ",
     jobs: ["นักวิเคราะห์ข้อมูลสุขภาพ (Health Data)", "นักสถิติการแพทย์", "ผู้เชี่ยวชาญเทคโนโลยีสุขภาพ"],
     wow: true,
   },
   CREATIVE: {
-    thTitle: "นักนวัตกรรมสร้างสรรค์",
-    enName: "The Creative Innovator",
-    icon: "🎨",
+    thTitle: "นักนวัตกรรมสร้างสรรค์", enName: "The Creative Innovator", icon: "🎨",
     desc: "จินตนาการของคุณไม่มีที่สิ้นสุด! คุณสามารถเปลี่ยนเรื่องยากๆ ให้เข้าใจง่ายและสวยงาม",
     tip: "ลองนำศิลปะมาผสมกับวิทยาศาสตร์ดูสิ คุณอาจสร้างสื่อการแพทย์ที่ล้ำสุดๆ ได้",
     jobs: ["นักออกแบบผลิตภัณฑ์สุขภาพ", "Medical Illustrator", "นักสื่อสารวิทยาศาสตร์สุขภาพ"],
     wow: false,
   },
   SCIENTIST: {
-    thTitle: "นักวิทยาศาสตร์ผู้พิทักษ์",
-    enName: "The Guardian Scientist",
-    icon: "🔬",
+    thTitle: "นักวิทยาศาสตร์ผู้พิทักษ์", enName: "The Guardian Scientist", icon: "🔬",
     desc: "คุณคือยอดนักสืบแห่งโลกจุลทรรศน์! ช่างสังเกต ชอบค้นหาคำตอบด้วยเหตุผล และไม่ยอมแพ้ต่อปริศนา",
     tip: "ฝึกฝนทักษะการสังเกตและการตั้งคำถาม 'ทำไม' บ่อยๆ คือกุญแจสู่ความสำเร็จของคุณ",
     jobs: ["นักวิทยาศาสตร์การแพทย์", "เจ้าหน้าที่ห้องปฏิบัติการ", "นักวิจัย/นักนิติวิทยาศาสตร์"],
@@ -146,7 +114,6 @@ function computeResultType() {
 
 function setResultUI(type) {
   const r = archetypes[type];
-
   $("res-icon").innerText = r.icon;
   $("res-title").innerText = r.thTitle;
   $("res-en").innerText = r.enName;
@@ -166,9 +133,9 @@ function setResultUI(type) {
   else wow.classList.add("hidden");
 }
 
-// =====================
-// Landing validation
-// =====================
+/* =====================
+   Landing validation
+   ===================== */
 function getLandingData_() {
   const name = ($("inp-name")?.value || "").trim();
   const age = ($("inp-age")?.value || "").toString().trim();
@@ -183,31 +150,79 @@ function validateLanding_() {
   $("btn-start").disabled = !ok;
 }
 
-// =====================
-// LIFF init (ไม่ force login)
-// - ถ้า logged in: เติมชื่อจาก LINE ให้ช่องชื่อ
-// - ถ้า guest: ปล่อยชื่อว่าง
-// =====================
-window.addEventListener("load", async () => {
-  $("inp-name").addEventListener("input", validateLanding_);
-  $("inp-age").addEventListener("input", validateLanding_);
-  $("inp-gender").addEventListener("change", validateLanding_);
+/* =====================
+   Backend helper
+   ===================== */
+async function callBackend_(action, data) {
+  const payload = { action, data };
+  const res = await fetch(GAS_WEBAPP_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(payload),
+  });
 
-  const fallbackTimer = setTimeout(() => {
-    setStatus(false, "👤 โหมดบุคคลทั่วไป (กรอกข้อมูลแล้วเริ่มได้เลย)");
-  }, 6000);
+  let out = null;
+  try { out = await res.json(); } catch {}
+  if (!out) throw new Error("Backend returned non-JSON");
+  if (out.status === "error") throw new Error(out.message || "Backend error");
+  return out;
+}
 
+/* =====================
+   Session: reserve unique code via Google Sheet
+   ===================== */
+function getSessionCodeLocal_() {
+  try { return sessionStorage.getItem(SESSION_KEY) || ""; } catch { return ""; }
+}
+function setSessionCodeLocal_(code) {
+  try { sessionStorage.setItem(SESSION_KEY, code); } catch {}
+}
+
+async function ensureUniqueSessionCode_() {
+  // 1) If already have local code -> verify with server
+  const local = getSessionCodeLocal_().trim();
+  if (local) {
+    try {
+      const chk = await callBackend_("session_exists", { sessionCode: local });
+      // if NOT exists in sheet -> safe to keep
+      if (chk && chk.exists === false) return local;
+      // else already used -> reserve a new one
+    } catch (_) {
+      // if cannot check -> still reserve new (safer)
+    }
+  }
+
+  // 2) Reserve from server (server guarantees uniqueness)
+  const out = await callBackend_("reserve_session", { hint: "client_init" });
+  const code = (out.sessionCode || "").trim();
+  if (!code) throw new Error("reserve_session returned empty code");
+  setSessionCodeLocal_(code);
+  return code;
+}
+
+/* =====================
+   LIFF init with timeout (fix stuck)
+   ===================== */
+function withTimeout_(promise, ms, timeoutMessage) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage || "timeout")), ms))
+  ]);
+}
+
+async function initLiffSafe_() {
+  // Always show something quickly (never stuck)
+  setStatus(false, "👤 กำลังเตรียมระบบ...");
+
+  // If LIFF script not available -> guest mode
   if (typeof liff === "undefined") {
-    clearTimeout(fallbackTimer);
     setStatus(false, "👤 โหมดบุคคลทั่วไป (กรอกข้อมูลแล้วเริ่มได้เลย)");
-    validateLanding_();
     return;
   }
 
   try {
-    await liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: false });
-    await liff.ready;
-    clearTimeout(fallbackTimer);
+    await withTimeout_(liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: false }), 6000, "LIFF init timeout");
+    await withTimeout_(liff.ready, 6000, "LIFF ready timeout");
 
     liffInfo.os = liff.getOS?.() || "";
     liffInfo.lang = liff.getLanguage?.() || "";
@@ -216,26 +231,52 @@ window.addEventListener("load", async () => {
     liffInfo.isLoggedIn = !!(liff.isLoggedIn && liff.isLoggedIn());
 
     if (liffInfo.isLoggedIn) {
-      lineProfile = await liff.getProfile(); // เก็บ "ทั้งหมด"
+      lineProfile = await withTimeout_(liff.getProfile(), 6000, "getProfile timeout");
       const displayName = lineProfile?.displayName || "";
       setStatus(true, `✅ สวัสดีคุณ ${displayName || "ครับ"} ✨`);
-
-      // ✅ เติมชื่อให้ช่องชื่อ (ถ้ายังว่าง)
       if (displayName && !$("inp-name").value.trim()) $("inp-name").value = displayName;
     } else {
       setStatus(false, "👤 โหมดบุคคลทั่วไป (กรอกข้อมูลแล้วเริ่มได้เลย)");
     }
   } catch (e) {
-    clearTimeout(fallbackTimer);
+    // On any LIFF failure -> guest mode, but not stuck
+    console.error("LIFF init failed:", e);
     setStatus(false, "👤 โหมดบุคคลทั่วไป (กรอกข้อมูลแล้วเริ่มได้เลย)");
+  }
+}
+
+/* =====================
+   Boot (DOMContentLoaded)
+   ===================== */
+window.addEventListener("DOMContentLoaded", async () => {
+  // Global error -> show in status so you don't get stuck silently
+  window.addEventListener("error", (ev) => {
+    console.error("Global error:", ev?.error || ev?.message || ev);
+    setStatus(false, "⚠️ โหลดระบบไม่สำเร็จ (ตรวจ Console) / เปิดใหม่อีกครั้ง");
+  });
+
+  $("inp-name").addEventListener("input", validateLanding_);
+  $("inp-age").addEventListener("input", validateLanding_);
+  $("inp-gender").addEventListener("change", validateLanding_);
+
+  // Start LIFF (never stuck)
+  await initLiffSafe_();
+
+  // Reserve unique session (server checks sheet)
+  try {
+    const code = await ensureUniqueSessionCode_();
+    console.log("Session code:", code);
+  } catch (e) {
+    console.error("Session reserve failed:", e);
+    // still allow user to play
   }
 
   validateLanding_();
 });
 
-// =====================
-// Quiz flow
-// =====================
+/* =====================
+   Quiz flow
+   ===================== */
 function resetQuizState_() {
   currentQ = 0;
   scores = { SCIENTIST: 0, DATA: 0, HEALER: 0, CREATIVE: 0 };
@@ -270,11 +311,8 @@ function renderQuestion_() {
       scores[ans.type] = (scores[ans.type] || 0) + 1;
 
       currentQ++;
-      if (currentQ < questions.length) {
-        renderQuestion_();
-      } else {
-        await onQuizCompleted_(); // ✅ หลังตอบข้อ 5 แสดงผล + log + ส่งข้อความ 1 ครั้ง
-      }
+      if (currentQ < questions.length) renderQuestion_();
+      else await onQuizCompleted_();
     };
     container.appendChild(btn);
   });
@@ -282,7 +320,12 @@ function renderQuestion_() {
 
 async function onQuizCompleted_() {
   const { name, age, gender } = getLandingData_();
-  const sessionCode = getSessionCode_();
+
+  // Ensure we have a unique session (if local is used already, server will replace)
+  let sessionCode = getSessionCodeLocal_().trim();
+  if (!sessionCode) {
+    try { sessionCode = await ensureUniqueSessionCode_(); } catch (_) {}
+  }
 
   const type = computeResultType();
   const r = archetypes[type];
@@ -294,7 +337,7 @@ async function onQuizCompleted_() {
   switchView("view-quiz", "view-result");
 
   try {
-    await callBackend_("quiz_complete", {
+    const out = await callBackend_("quiz_complete", {
       sessionCode,
       certificateClick: 0,
 
@@ -303,10 +346,16 @@ async function onQuizCompleted_() {
       resultType: lastResultType,
       resultTH: lastResultTH,
       resultEN: lastResultEN,
+
       liffInfo: { ...liffInfo },
       profile: lineProfile || null,
       client: buildClientMeta(),
     });
+
+    // If server replaced sessionCode (collision), update local
+    if (out && out.sessionCode && out.sessionCode !== sessionCode) {
+      setSessionCodeLocal_(out.sessionCode);
+    }
   } catch (e) {
     console.error("quiz_complete failed:", e);
     alert("บันทึกลงชีทไม่สำเร็จ: " + (e?.message || e));
@@ -315,9 +364,9 @@ async function onQuizCompleted_() {
   await sendResultMessageOnce_(name, lastResultTH);
 }
 
-// =====================
-// Send LINE message once
-// =====================
+/* =====================
+   Send LINE message once
+   ===================== */
 async function sendResultMessageOnce_(name, resultTH) {
   if (sentResultMessage) return;
   sentResultMessage = true;
@@ -335,48 +384,25 @@ async function sendResultMessageOnce_(name, resultTH) {
       `ผลลัพธ์ของคุณคือ: "${resultTH}" ✨`;
 
     await liff.sendMessages([{ type: "text", text }]);
-  } catch (_) {
-    // เงียบไว้ (บางกรณี LINE ไม่อนุญาตส่งจาก external)
+  } catch (e) {
+    console.warn("sendMessages blocked:", e);
   }
 }
 
-// =====================
-// Backend helper
-// =====================
-async function callBackend_(action, data) {
-  const payload = { action, data };
-  const res = await fetch(GAS_WEBAPP_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(payload),
-  });
-
-  let out = null;
-  try { out = await res.json(); } catch {}
-  if (!out) throw new Error("Backend returned non-JSON");
-  if (out.status === "error") throw new Error(out.message || "Backend error");
-  return out;
-}
-
-// =====================
-// Result buttons
-// =====================
+/* =====================
+   Result buttons
+   ===================== */
 window.restartToLanding = function restartToLanding() {
-  // กลับหน้าแรก (ไม่กลับไป q1)
   resetQuizState_();
-
-  // เคลียร์อายุ/เพศเสมอ (ให้กรอกใหม่), ชื่อคงไว้ถ้ามาจาก LINE
   const hasLineName = !!(lineProfile?.displayName);
   if (!hasLineName) $("inp-name").value = "";
   $("inp-age").value = "";
   $("inp-gender").value = "";
-
   validateLanding_();
   switchView("view-result", "view-landing");
 };
 
 window.goOA = function goOA() {
-  // กลับไป OA
   try {
     if (typeof liff !== "undefined" && liff.openWindow && liffInfo.isInClient) {
       liff.openWindow({ url: OA_URL, external: false });
@@ -386,13 +412,12 @@ window.goOA = function goOA() {
   window.location.href = OA_URL;
 };
 
-
 window.openCertificateFormExternal = async function openCertificateFormExternal() {
   const { name, age, gender } = getLandingData_();
-  const sessionCode = getSessionCode_();
+  const sessionCode = getSessionCodeLocal_().trim() || (await ensureUniqueSessionCode_().catch(() => ""));
 
   try {
-    await callBackend_("certificate_click", {
+    const out = await callBackend_("certificate_click", {
       sessionCode,
       certificateClick: 1,
       name, age, gender,
@@ -403,9 +428,11 @@ window.openCertificateFormExternal = async function openCertificateFormExternal(
       profile: lineProfile || null,
       client: buildClientMeta(),
     });
+    if (out && out.sessionCode && out.sessionCode !== sessionCode) {
+      setSessionCodeLocal_(out.sessionCode);
+    }
   } catch (e) {
     console.error("certificate_click failed:", e);
-    // still open form even if logging fails
   }
 
   try {

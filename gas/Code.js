@@ -4,14 +4,25 @@ function doPost(e) {
     const action = body.action;
     const data = body.data || {};
 
+    if (action === "reserve_session") {
+      const code = reserveSessionCode_();
+      return json_({ status: "ok", sessionCode: code });
+    }
+
+    if (action === "session_exists") {
+      const code = String(data.sessionCode || "").trim();
+      const exists = code ? sessionExists_(code) : false;
+      return json_({ status: "ok", exists });
+    }
+
     if (action === "quiz_complete") {
-      appendQuizRow_(data);
-      return json_({ status: "ok" });
+      const used = appendQuizRow_(data);
+      return json_({ status: "ok", sessionCode: used });
     }
 
     if (action === "certificate_click") {
-      markCertificateClick_(data);
-      return json_({ status: "ok" });
+      const used = markCertificateClick_(data);
+      return json_({ status: "ok", sessionCode: used });
     }
 
     return json_({ status: "error", message: "Unknown action: " + action });
@@ -20,13 +31,15 @@ function doPost(e) {
   }
 }
 
+/* ===== Config ===== */
+const SHEET_ID = "1sDXwbmV10B-mFlxRsojwRshByOKfhhkpPwlK4twzGxU";
+const SHEET_NAME = "Sheet1";
+
+/* ===== Sheet ===== */
 function getSheet_() {
-  const SHEET_ID = "1sDXwbmV10B-mFlxRsojwRshByOKfhhkpPwlK4twzGxU";
-  const SHEET_NAME = "Sheet1"
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
 
-  // Header (create once)
   if (sh.getLastRow() === 0) {
     sh.appendRow([
       "tsServer",
@@ -42,15 +55,56 @@ function getSheet_() {
   return sh;
 }
 
+/* ===== Session code (unique against Sheet) ===== */
+function genSessionCode_() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let s = "";
+  for (let i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+function sessionExists_(code) {
+  const sh = getSheet_();
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return false;
+
+  const rng = sh.getRange(2, 2, lastRow - 1, 1); // sessionCode column
+  const found = rng.createTextFinder(code).matchEntireCell(true).findNext();
+  return !!found;
+}
+
+function reserveSessionCode_() {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(8000);
+  try {
+    // Try several times until unique
+    for (let i = 0; i < 50; i++) {
+      const code = genSessionCode_();
+      if (!sessionExists_(code)) return code;
+    }
+    // Extremely unlikely; fall back to timestamp-based
+    return "X" + String(new Date().getTime()).slice(-4);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ===== Append Quiz Row (server guarantees unique sessionCode) ===== */
 function appendQuizRow_(d) {
   const lock = LockService.getScriptLock();
-  lock.waitLock(5000);
+  lock.waitLock(8000);
   try {
     const sh = getSheet_();
 
+    let code = String(d.sessionCode || "").trim();
+    if (!code || sessionExists_(code)) {
+      // if missing or collision -> issue new code
+      code = reserveSessionCode_();
+    }
+
     sh.appendRow([
       new Date(),
-      d.sessionCode || "",
+      code,
       Number(d.certificateClick || 0),
       "",
 
@@ -73,46 +127,53 @@ function appendQuizRow_(d) {
       JSON.stringify(d.client || {}),
       JSON.stringify(d.answers || [])
     ]);
+
+    return code;
   } finally {
     lock.releaseLock();
   }
 }
 
+/* ===== Mark certificate click on the row by sessionCode ===== */
 function markCertificateClick_(d) {
-  const code = (d.sessionCode || "").trim();
+  const code = String(d.sessionCode || "").trim();
   if (!code) throw new Error("Missing sessionCode");
 
   const lock = LockService.getScriptLock();
-  lock.waitLock(5000);
+  lock.waitLock(8000);
   try {
     const sh = getSheet_();
     const lastRow = sh.getLastRow();
-    if (lastRow < 2) throw new Error("QuizLog is empty");
+    if (lastRow < 2) throw new Error("Sheet is empty");
 
-    // Find the latest matching sessionCode (search from bottom)
-    const colSession = 2; // sessionCode column index (1-based)
-    const colCert = 3;    // certificateClick
-    const colCertAt = 4;  // certificateClickAt
+    const colSession = 2;
+    const colCert = 3;
+    const colCertAt = 4;
 
-    const values = sh.getRange(2, colSession, lastRow - 1, 1).getValues(); // session codes
+    // Find from bottom (latest)
+    const values = sh.getRange(2, colSession, lastRow - 1, 1).getValues();
     let foundRow = -1;
     for (let i = values.length - 1; i >= 0; i--) {
       if (String(values[i][0]).trim() === code) {
-        foundRow = i + 2; // offset header
+        foundRow = i + 2;
         break;
       }
     }
-    if (foundRow === -1) throw new Error("sessionCode not found: " + code);
+
+    if (foundRow === -1) {
+      // If not found, do NOT create new row (avoids mismatch)
+      throw new Error("sessionCode not found: " + code);
+    }
 
     sh.getRange(foundRow, colCert).setValue(1);
     sh.getRange(foundRow, colCertAt).setValue(new Date());
+    return code;
   } finally {
     lock.releaseLock();
   }
 }
 
 function json_(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
+  return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }

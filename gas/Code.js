@@ -362,6 +362,9 @@ function buildResultFlex_(name, resultTH, resultEN, emoji, sessionCode) {
         contents: [
           { type: "text", text: "The Future Compass 🧭", weight: "bold", size: "lg" },
           { type: "text", text: `สวัสดี ${name} 😊`, size: "md", wrap: true },
+
+          { type: "text", text: "คุณคือ", size: "sm", weight: "bold", color: "#0f766e", wrap: true },
+
           {
             type: "box",
             layout: "baseline",

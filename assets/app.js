@@ -411,12 +411,6 @@ function openFormExternal_() {
   window.open(CERT_GOOGLE_FORM_URL, "_blank");
 }
 
-// ✅ ใช้ทั้งหน้าแรก + หน้าผลลัพธ์
-window.openCertificateFromLanding = async function openCertificateFromLanding() {
-  await logCertificateClick_();
-  openFormExternal_();
-};
-
 window.openCertificateFormExternal = async function openCertificateFormExternal() {
   await logCertificateClick_();
   openFormExternal_();

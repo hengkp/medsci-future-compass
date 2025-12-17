@@ -1,35 +1,19 @@
 // web/assets/app.js
 const { LIFF_ID, GAS_WEBAPP_URL, OA_URL, CERT_GOOGLE_FORM_URL } = window.APP_CONFIG;
 
-let lineUserId = "";      
-let lineDisplayName = ""; 
-let linePictureUrl = "";
 let liffInfo = { os:"", lang:"", version:"", isInClient:false, isLoggedIn:false };
+let lineProfile = null; // เก็บ getProfile "ทั้งหมด"วัตถุ
 
 let currentQ = 0;
 let scores = { SCIENTIST: 0, DATA: 0, HEALER: 0, CREATIVE: 0 };
-let userAnswers = [];        // เก็บ text
-let userAnswerMeta = [];     // เก็บ meta (สำหรับ age/gender)
+let userAnswers = [];
 
 let lastResultType = "";
 let lastResultTH = "";
 let lastResultEN = "";
-let impliedAge = "";
-let impliedGender = "";
+let sentResultMessage = false; // กันส่งซ้ำ
 
-let quizRecorded = false;
-let giftEligibility = { eligible:false, alreadyPlayed:false, todayRemaining:0, todayCap:100, existingStatus:"" };
-let giftState = { drawn:false, status:"" };
-
-function $(id) { return document.getElementById(id); }
-
-function setStatus(ok, html) {
-  const statusDiv = $("liff-status");
-  statusDiv.className = ok
-    ? "text-sm text-green-700 font-bold bg-green-50 py-2 px-4 rounded-xl flex items-center justify-center gap-2 border border-green-200 shadow-sm"
-    : "text-sm text-gray-500 font-medium bg-gray-50 py-2 px-4 rounded-xl flex items-center justify-center gap-2 border border-gray-200";
-  statusDiv.innerHTML = html;
-}
+function $(id){ return document.getElementById(id); }
 
 function switchView(fromId, toId) {
   $(fromId).classList.add("hidden");
@@ -37,23 +21,30 @@ function switchView(fromId, toId) {
   $("main-scroll").scrollTop = 0;
 }
 
+function setStatus(ok, html) {
+  const statusDiv = $("liff-status");
+  statusDiv.className = ok
+    ? "text-green-700 font-extrabold bg-green-50 py-2 px-4 rounded-xl flex items-center justify-center gap-2 border border-green-200 shadow-sm"
+    : "text-gray-600 font-extrabold bg-gray-50 py-2 px-4 rounded-xl flex items-center justify-center gap-2 border border-gray-200";
+  statusDiv.innerHTML = html;
+}
+
 function safeNowISO() {
   try { return new Date().toISOString(); } catch { return ""; }
 }
 
 function buildClientMeta() {
-  const meta = {
+  return {
     tsClientISO: safeNowISO(),
     ua: navigator.userAgent || "",
+    href: location.href || "",
     referrer: document.referrer || "",
   };
-  return meta;
 }
 
-/* ===========================
-   ✅ Questions (เพิ่ม 2 ข้อ: age + gender)
-   =========================== */
-
+// =====================
+// Questions = 5 ข้อเท่านั้น
+// =====================
 const questions = [
   { q: "1. ถ้าโลกถูกไวรัสปริศนาโจมตี น้องจะรับบทบาทไหน?", answers: [
     { text: "วิจัยหาวัคซีนในห้องแล็บ", type: "SCIENTIST" },
@@ -84,22 +75,6 @@ const questions = [
     { text: "สร้างผลงานที่คนจดจำ", type: "CREATIVE" },
     { text: "ทำให้สังคมมีความสุข", type: "HEALER" },
     { text: "แก้ปัญหาด้วยเทคโนโลยี", type: "DATA" },
-  ]},
-
-  // ✅ NEW Q6 (implied age)
-  { q: "6. เข็มทิศอนาคตบอกว่า...ช่วงอายุโดยประมาณของน้องคือ?", answers: [
-    { text: "ต่ำกว่า 13", type: "META", meta: { impliedAge: "<13" } },
-    { text: "13–15", type: "META", meta: { impliedAge: "13-15" } },
-    { text: "16–18", type: "META", meta: { impliedAge: "16-18" } },
-    { text: "19+", type: "META", meta: { impliedAge: "19+" } },
-  ]},
-
-  // ✅ NEW Q7 (implied gender)
-  { q: "7. น้องอยากให้เรียกด้วยสรรพนาม/ตัวตนแบบไหน?", answers: [
-    { text: "เขา/ผม", type: "META", meta: { impliedGender: "male_or_he" } },
-    { text: "เธอ/ฉัน", type: "META", meta: { impliedGender: "female_or_she" } },
-    { text: "เขา/เธอได้หมด", type: "META", meta: { impliedGender: "any_pronoun" } },
-    { text: "ไม่อยากระบุ", type: "META", meta: { impliedGender: "no_answer" } },
   ]},
 ];
 
@@ -143,12 +118,12 @@ const archetypes = {
 };
 
 function computeResultType() {
-  // META answers do not affect score
   return Object.keys(scores).reduce((a, b) => (scores[a] > scores[b] ? a : b));
 }
 
 function setResultUI(type) {
   const r = archetypes[type];
+
   $("res-icon").innerText = r.icon;
   $("res-title").innerText = r.thTitle;
   $("res-en").innerText = r.enName;
@@ -168,25 +143,41 @@ function setResultUI(type) {
   else wow.classList.add("hidden");
 }
 
-/* ===========================
-   ✅ LIFF init (ยังไม่ force login)
-   =========================== */
-window.addEventListener("load", async () => {
-  const startBtn = $("btn-start");
+// =====================
+// Landing validation
+// =====================
+function getLandingData_() {
+  const name = ($("inp-name")?.value || "").trim();
+  const age = ($("inp-age")?.value || "").toString().trim();
+  const gender = ($("inp-gender")?.value || "").trim();
+  return { name, age, gender };
+}
 
-  $("q-total").innerText = String(questions.length);
+function validateLanding_() {
+  const { name, age, gender } = getLandingData_();
+  const ageNum = Number(age);
+  const ok = !!name && !!gender && Number.isFinite(ageNum) && ageNum >= 1 && ageNum <= 120;
+  $("btn-start").disabled = !ok;
+}
+
+// =====================
+// LIFF init (ไม่ force login)
+// - ถ้า logged in: เติมชื่อจาก LINE ให้ช่องชื่อ
+// - ถ้า guest: ปล่อยชื่อว่าง
+// =====================
+window.addEventListener("load", async () => {
+  $("inp-name").addEventListener("input", validateLanding_);
+  $("inp-age").addEventListener("input", validateLanding_);
+  $("inp-gender").addEventListener("change", validateLanding_);
 
   const fallbackTimer = setTimeout(() => {
-    if (startBtn.disabled) {
-      setStatus(false, "👤 โหมดบุคคลทั่วไป (ทำแบบทดสอบได้)");
-      startBtn.disabled = false;
-    }
-  }, 8000);
+    setStatus(false, "👤 โหมดบุคคลทั่วไป (กรอกข้อมูลแล้วเริ่มได้เลย)");
+  }, 6000);
 
   if (typeof liff === "undefined") {
     clearTimeout(fallbackTimer);
-    setStatus(false, "👤 โหมดบุคคลทั่วไป (ทำแบบทดสอบได้)");
-    startBtn.disabled = false;
+    setStatus(false, "👤 โหมดบุคคลทั่วไป (กรอกข้อมูลแล้วเริ่มได้เลย)");
+    validateLanding_();
     return;
   }
 
@@ -202,52 +193,45 @@ window.addEventListener("load", async () => {
     liffInfo.isLoggedIn = !!(liff.isLoggedIn && liff.isLoggedIn());
 
     if (liffInfo.isLoggedIn) {
-      const profile = await liff.getProfile();
-      lineUserId = profile?.userId || "";
-      lineDisplayName = profile?.displayName || "";
-      linePictureUrl = profile?.pictureUrl || "";
-      setStatus(true, `✅ ยินดีต้อนรับคุณ ${lineDisplayName || "ครับ"} ✨`);
-    } else {
-      setStatus(false, "👤 โหมดบุคคลทั่วไป (ทำแบบทดสอบได้)");
-    }
+      lineProfile = await liff.getProfile(); // เก็บ "ทั้งหมด"
+      const displayName = lineProfile?.displayName || "";
+      setStatus(true, `✅ สวัสดีคุณ ${displayName || "ครับ"} ✨`);
 
-    startBtn.disabled = false;
-    startBtn.classList.add("pulse-slow");
-  } catch (err) {
+      // ✅ เติมชื่อให้ช่องชื่อ (ถ้ายังว่าง)
+      if (displayName && !$("inp-name").value.trim()) $("inp-name").value = displayName;
+    } else {
+      setStatus(false, "👤 โหมดบุคคลทั่วไป (กรอกข้อมูลแล้วเริ่มได้เลย)");
+    }
+  } catch (e) {
     clearTimeout(fallbackTimer);
-    setStatus(false, "👤 โหมดบุคคลทั่วไป (ทำแบบทดสอบได้)");
-    startBtn.disabled = false;
+    setStatus(false, "👤 โหมดบุคคลทั่วไป (กรอกข้อมูลแล้วเริ่มได้เลย)");
   }
+
+  validateLanding_();
 });
 
-/* ===========================
-   ✅ Quiz flow
-   =========================== */
-function resetQuizState() {
+// =====================
+// Quiz flow
+// =====================
+function resetQuizState_() {
   currentQ = 0;
   scores = { SCIENTIST: 0, DATA: 0, HEALER: 0, CREATIVE: 0 };
   userAnswers = [];
-  userAnswerMeta = [];
-  impliedAge = "";
-  impliedGender = "";
   lastResultType = "";
   lastResultTH = "";
   lastResultEN = "";
-  quizRecorded = false;
-
-  giftEligibility = { eligible:false, alreadyPlayed:false, todayRemaining:0, todayCap:100, existingStatus:"" };
-  giftState = { drawn:false, status:"" };
+  sentResultMessage = false;
 }
 
 window.startQuiz = function startQuiz() {
-  resetQuizState();
+  resetQuizState_();
   switchView("view-landing", "view-quiz");
-  renderQuestion();
+  renderQuestion_();
 };
 
-function renderQuestion() {
+function renderQuestion_() {
   const qData = questions[currentQ];
-  $("q-num").innerText = currentQ + 1;
+  $("q-num").innerText = String(currentQ + 1);
   $("progress-bar").style.width = `${((currentQ + 1) / questions.length) * 100}%`;
   $("q-text").innerText = qData.q;
 
@@ -259,32 +243,23 @@ function renderQuestion() {
     btn.className = "choice-btn";
     btn.innerHTML = `<span>${ans.text}</span> <span class="text-gray-300 text-xl">➜</span>`;
     btn.onclick = async () => {
-      // Record answer
       userAnswers.push(ans.text);
-      userAnswerMeta.push(ans.meta || {});
-
-      // Score only non-META
-      if (ans.type && ans.type !== "META") {
-        scores[ans.type] = (scores[ans.type] || 0) + 1;
-      }
-
-      // Apply implied meta
-      if (ans.meta?.impliedAge) impliedAge = ans.meta.impliedAge;
-      if (ans.meta?.impliedGender) impliedGender = ans.meta.impliedGender;
+      scores[ans.type] = (scores[ans.type] || 0) + 1;
 
       currentQ++;
-
       if (currentQ < questions.length) {
-        renderQuestion();
+        renderQuestion_();
       } else {
-        await showResultAndRecord(); // ✅ requirement: record + send message first
+        await onQuizCompleted_(); // ✅ หลังตอบข้อ 5 แสดงผล + log + ส่งข้อความ 1 ครั้ง
       }
     };
     container.appendChild(btn);
   });
 }
 
-async function showResultAndRecord() {
+async function onQuizCompleted_() {
+  const { name, age, gender } = getLandingData_();
+
   const type = computeResultType();
   const r = archetypes[type];
   lastResultType = type;
@@ -292,35 +267,57 @@ async function showResultAndRecord() {
   lastResultEN = r.enName;
 
   setResultUI(type);
-
-  // Show result UI first (fast) but we will lock gift until record ok
   switchView("view-quiz", "view-result");
 
-  // ✅ Disable gift until we finish record step
-  const btnGift = $("btn-gift");
-  if (btnGift) {
-    btnGift.disabled = true;
-    btnGift.innerHTML = '⏳ กำลังบันทึกผล...';
+  // ✅ 1) บันทึกลงชีท (วันเวลา/ชื่อ/อายุ/เพศ/คำตอบ/ผล/โปรไฟล์)
+  try {
+    await callBackend_("quiz_complete", {
+      name, age, gender,
+      answers: userAnswers.slice(0),
+      resultType: lastResultType,
+      resultTH: lastResultTH,
+      resultEN: lastResultEN,
+      liffInfo: { ...liffInfo },
+      profile: lineProfile || null, // getProfile "ทั้งหมด"
+      client: buildClientMeta(),
+    });
+  } catch (_) {
+    // ไม่บังคับให้ fail เพราะต้องให้ดูผลได้
   }
 
+  // ✅ 2) ส่งข้อความเข้าแชท "เพียง 1 ข้อความ" หลังได้ผลลัพธ์
+  await sendResultMessageOnce_(name, lastResultTH);
+}
+
+// =====================
+// Send LINE message once
+// =====================
+async function sendResultMessageOnce_(name, resultTH) {
+  if (sentResultMessage) return;
+  sentResultMessage = true;
+
   try {
-    await postQuizComplete_();     // record + push greeting/result message
-    quizRecorded = true;
-  } catch (e) {
-    // still allow user to see result, but gift should be blocked if not recorded
-    quizRecorded = false;
-    alert("บันทึกผลไม่สำเร็จ (ยังดูผลได้) : " + (e?.message || e));
-  } finally {
-    if (btnGift) {
-      btnGift.disabled = false;
-      btnGift.innerHTML = "🎁 ลุ้นรางวัล";
-    }
+    if (typeof liff === "undefined") return;
+    if (!(liff.isInClient && liff.isInClient())) return;
+    if (!(liff.isLoggedIn && liff.isLoggedIn())) return;
+    if (!liff.sendMessages) return;
+
+    const safeName = name || (lineProfile?.displayName || "เพื่อนใหม่");
+    const text =
+      `สวัสดี ${safeName} 👋\n` +
+      `ขอบคุณที่ร่วมสนุกกับ "The Future Compass 🧭"\n` +
+      `ผลลัพธ์ของคุณคือ: "${resultTH}" ✨\n` +
+      `แวะรับเกียรติบัตรได้เลยนะครับ 🏆`;
+
+    await liff.sendMessages([{ type: "text", text }]);
+  } catch (_) {
+    // เงียบไว้ (บางกรณี LINE ไม่อนุญาตส่งจาก external)
   }
 }
 
-/* ===========================
-   ✅ Backend calls
-   =========================== */
+// =====================
+// Backend helper
+// =====================
 async function callBackend_(action, data) {
   const payload = { action, data };
   const res = await fetch(GAS_WEBAPP_URL, {
@@ -328,6 +325,7 @@ async function callBackend_(action, data) {
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify(payload),
   });
+
   let out = null;
   try { out = await res.json(); } catch {}
   if (!out) throw new Error("Backend returned non-JSON");
@@ -335,261 +333,43 @@ async function callBackend_(action, data) {
   return out;
 }
 
-function buildCommonData_() {
-  return {
-    lineUserId,
-    lineDisplayName,
-    linePictureUrl,
-    liff: { ...liffInfo },
-    client: buildClientMeta(),
-  };
-}
+// =====================
+// Result buttons
+// =====================
+window.restartToLanding = function restartToLanding() {
+  // กลับหน้าแรก (ไม่กลับไป q1)
+  resetQuizState_();
 
-async function postQuizComplete_() {
-  const common = buildCommonData_();
-  const payload = {
-    ...common,
+  // เคลียร์อายุ/เพศเสมอ (ให้กรอกใหม่), ชื่อคงไว้ถ้ามาจาก LINE
+  const hasLineName = !!(lineProfile?.displayName);
+  if (!hasLineName) $("inp-name").value = "";
+  $("inp-age").value = "";
+  $("inp-gender").value = "";
 
-    resultType: lastResultType,
-    resultTH: lastResultTH,
-    resultEN: lastResultEN,
-
-    impliedAge: impliedAge || "",
-    impliedGender: impliedGender || "",
-
-    answers: userAnswers.slice(0),
-  };
-
-  // ✅ ส่งข้อความทักทาย + ผลลัพธ์ + บันทึกชีท
-  return await callBackend_("quiz_complete", payload);
-}
-
-/* ===========================
-   ✅ Result page actions
-   =========================== */
-window.restartQuiz = function restartQuiz() {
-  resetQuizState();
+  validateLanding_();
   switchView("view-result", "view-landing");
 };
 
 window.goOA = function goOA() {
+  // กลับไป OA
+  try {
+    if (typeof liff !== "undefined" && liff.openWindow && liffInfo.isInClient) {
+      liff.openWindow({ url: OA_URL, external: false });
+      return;
+    }
+  } catch (_) {}
   window.location.href = OA_URL;
 };
 
-window.openCertificateFormExternal = async function openCertificateFormExternal() {
-  // log click -> certificate_status = ต้องการ
+
+window.openCertificateFormExternal = function openCertificateFormExternal() {
+  // เปิดแบบ external เสมอ (ไม่ต้องกรอกใน UI นี้)
   try {
-    await callBackend_("certificate_click", {
-      ...buildCommonData_(),
-      certificateStatus: "ต้องการ",
-      resultType: lastResultType,
-      resultTH: lastResultTH,
-      impliedAge: impliedAge || "",
-      impliedGender: impliedGender || "",
-    });
-  } catch (_) {
-    // allow open anyway
-  }
+    if (typeof liff !== "undefined" && liff.openWindow) {
+      liff.openWindow({ url: CERT_GOOGLE_FORM_URL, external: true });
+      return;
+    }
+  } catch (_) {}
+
   window.open(CERT_GOOGLE_FORM_URL, "_blank");
 };
-
-/* ===========================
-   ✅ Gift flow (Line account only)
-   =========================== */
-function setStickerMode_(mode) {
-  // mode: idle | checking | flashing | success | fail
-  const L = $("sticker-left");
-  const R = $("sticker-right");
-  if (!L || !R) return;
-
-  L.classList.remove("flash", "active");
-  R.classList.remove("flash", "active");
-
-  if (mode === "flashing") {
-    L.classList.add("flash");
-    R.classList.add("flash");
-  } else if (mode === "success") {
-    L.classList.add("active");
-  } else if (mode === "fail") {
-    R.classList.add("active");
-  }
-}
-
-function setGiftMessage_(html) {
-  const box = $("gift-message");
-  if (box) box.innerHTML = html;
-}
-
-function disableGiftButton_(disabled, labelHTML) {
-  const btn = $("gift-btn");
-  if (!btn) return;
-  if (disabled) btn.classList.add("disabled");
-  else btn.classList.remove("disabled");
-  if (labelHTML) btn.innerHTML = labelHTML;
-}
-
-window.backToResult = function backToResult() {
-  switchView("view-gift", "view-result");
-};
-
-window.openGift = async function openGift() {
-  // show gift view
-  switchView("view-result", "view-gift");
-
-  const name = lineDisplayName ? lineDisplayName : "เพื่อนใหม่";
-  $("gift-title").innerText = `สวัสดี ${name}!`;
-  $("gift-sub").innerText = `ผลของคุณคือ: “${lastResultTH || "—"}”`;
-
-  setStickerMode_("checking");
-  disableGiftButton_(true, "กำลัง<br>ตรวจสิทธิ์");
-  setGiftMessage_('⏳ กำลังตรวจสอบสิทธิ์และโควต้า...');
-
-  // ✅ Gift privileged to LINE account only
-  const canUseLiff = (typeof liff !== "undefined");
-  const isLoggedIn = !!(canUseLiff && liff.isLoggedIn && liff.isLoggedIn());
-
-  if (!isLoggedIn) {
-    setStickerMode_("idle");
-    disableGiftButton_(true, "ล็อกอิน<br>ก่อนนะ");
-    setGiftMessage_(
-      `🚫 “ลุ้นรางวัล” สำหรับผู้ที่ล็อกอิน LINE เท่านั้น<br><br>` +
-      `👉 กรุณาเปิดผ่าน LINE หรือกดล็อกอินเพื่อยืนยันตัวตน`
-    );
-
-    // Offer direct login if possible (no guest)
-    if (canUseLiff && liff.login) {
-      // show a helper button by reusing hint area
-      const hint = $("gift-hint");
-      if (hint) {
-        hint.innerHTML = `<button class="btn-secondary !py-3 !text-base" onclick="forceLineLogin()">🔐 ล็อกอินด้วย LINE</button>`;
-      }
-    }
-    return;
-  }
-
-  // must have userId
-  if (!lineUserId) {
-    setStickerMode_("idle");
-    disableGiftButton_(true, "ไม่พบ<br>User");
-    setGiftMessage_("⚠️ ระบบไม่พบ LINE userId กรุณาเปิดใน LINE Client แล้วลองใหม่อีกครั้ง");
-    return;
-  }
-
-  // require quiz recorded (fairness)
-  if (!quizRecorded) {
-    setStickerMode_("idle");
-    disableGiftButton_(true, "บันทึก<br>ไม่สำเร็จ");
-    setGiftMessage_("⚠️ ยังไม่สามารถลุ้นรางวัลได้ เพราะบันทึกผลแบบทดสอบไม่สำเร็จ กรุณากดเล่นใหม่อีกครั้ง");
-    return;
-  }
-
-  // check eligibility from sheets
-  try {
-    const out = await callBackend_("gift_status", {
-      ...buildCommonData_(),
-      resultType: lastResultType,
-      resultTH: lastResultTH,
-      impliedAge: impliedAge || "",
-      impliedGender: impliedGender || "",
-    });
-
-    giftEligibility = {
-      eligible: !!out.eligible,
-      alreadyPlayed: !!out.alreadyPlayed,
-      todayRemaining: Number(out.todayRemaining || 0),
-      todayCap: Number(out.todayCap || 100),
-      existingStatus: out.existingStatus || "",
-    };
-
-    if (giftEligibility.alreadyPlayed) {
-      setStickerMode_(giftEligibility.existingStatus === "SUCCESS" ? "success" : "fail");
-      disableGiftButton_(true, "เล่นแล้ว<br>วันนี้");
-      setGiftMessage_(
-        `🎉 คุณได้เล่นลุ้นรางวัลไปแล้วครับ<br>` +
-        `ผลล่าสุด: <b>${giftEligibility.existingStatus || "—"}</b><br><br>` +
-        `ชวนเพื่อนมาเล่นต่อได้เลย! 🧭`
-      );
-      return;
-    }
-
-    if (!giftEligibility.eligible) {
-      setStickerMode_("idle");
-      disableGiftButton_(true, "ยังไม่<br>พร้อม");
-      setGiftMessage_("⚠️ ยังไม่สามารถเล่นได้ในขณะนี้");
-      return;
-    }
-
-    if (giftEligibility.todayRemaining <= 0) {
-      setStickerMode_("idle");
-      disableGiftButton_(true, "โควต้า<br>เต็ม");
-      setGiftMessage_(
-        `😢 วันนี้มีผู้ได้รางวัลครบ <b>${giftEligibility.todayCap}</b> คนแล้ว<br>` +
-        `ตอนนี้โอกาสเป็น <b>0%</b> แล้วครับ แต่ยังรับเกียรติบัตรได้ 🏆`
-      );
-      return;
-    }
-
-    // eligible
-    setStickerMode_("idle");
-    disableGiftButton_(false, "กดลุ้น<br>ตอนนี้!");
-    setGiftMessage_(
-      `✅ พร้อมลุ้นแล้ว! วันนี้ยังเหลือสิทธิ์ของรางวัลอีกประมาณ <b>${giftEligibility.todayRemaining}</b> จาก ${giftEligibility.todayCap}<br>` +
-      `กดปุ่มวงกลมเพื่อสุ่มผลลุ้นรางวัล`
-    );
-  } catch (e) {
-    setStickerMode_("idle");
-    disableGiftButton_(true, "ผิดพลาด");
-    setGiftMessage_("❌ ตรวจสอบสิทธิ์ไม่สำเร็จ: " + (e?.message || e));
-  }
-};
-
-window.forceLineLogin = function forceLineLogin() {
-  if (typeof liff !== "undefined" && liff.login) liff.login();
-};
-
-window.drawGift = async function drawGift() {
-  // pre-check
-  if (!lineUserId) return;
-
-  // Start animation
-  setStickerMode_("flashing");
-  disableGiftButton_(true, "กำลัง<br>สุ่ม...");
-  setGiftMessage_('🎲 กำลังสุ่มผล... ขอให้โชคดี!');
-
-  try {
-    const out = await callBackend_("draw_gift", {
-      ...buildCommonData_(),
-      resultType: lastResultType,
-      resultTH: lastResultTH,
-      resultEN: lastResultEN,
-      impliedAge: impliedAge || "",
-      impliedGender: impliedGender || "",
-    });
-
-    const status = out.giftStatus || "FAIL";
-    giftState.drawn = true;
-    giftState.status = status;
-
-    // Stop flashing -> show result sticker
-    setStickerMode_(status === "SUCCESS" ? "success" : "fail");
-
-    if (status === "SUCCESS") {
-      setGiftMessage_(
-        `🎉 <b>ยินดีด้วย!</b> คุณได้รับของรางวัลวันนี้<br><br>` +
-        `👉 กรุณา <b>หยิบฉลาก 1 ชิ้น จากต้นคริสมาสต์</b> ที่บูทครับ 🎄`
-      );
-    } else {
-      setGiftMessage_(
-        `😢 <b>เสียใจด้วย</b> รอบนี้ยังไม่ถูกรางวัล<br><br>` +
-        `🎁 แต่คุณสามารถ <b>รับรางวัลปลอบใจที่บูท</b> ได้เลยครับ`
-      );
-    }
-
-    disableGiftButton_(true, "รับผลแล้ว<br>✓");
-  } catch (e) {
-    setStickerMode_("idle");
-    disableGiftButton_(false, "ลองอีก<br>ครั้ง");
-    setGiftMessage_("❌ สุ่มไม่สำเร็จ: " + (e?.message || e));
-  }
-};
-

@@ -13,8 +13,6 @@
     :root{
       --primary:#0d9488;
       --primary-dark:#0f766e;
-      --accent:#f59e0b;
-      --bg-soft:#f0fdfa;
     }
     body{
       font-family:'Sarabun',sans-serif;
@@ -29,6 +27,7 @@
       margin:0;
     }
     h1,h2,h3,button,.font-heading{font-family:'Kanit',sans-serif;}
+
     .glass-card{
       background:rgba(255,255,255,.92);
       backdrop-filter:blur(16px);
@@ -36,7 +35,7 @@
       border:1px solid rgba(255,255,255,.8);
       width:100%;
       height:100%;
-      max-width:500px;
+      max-width:520px;
       max-height:100vh;
       display:flex;
       flex-direction:column;
@@ -47,8 +46,9 @@
       line-height:1.65;
     }
     @media (min-width:640px){
-      .glass-card{ height:auto; max-height:90vh; border-radius:24px; font-size:18px; }
+      .glass-card{ height:auto; max-height:90vh; border-radius:24px; }
     }
+
     .scroll-content{
       flex-grow:1;
       overflow-y:auto;
@@ -58,26 +58,25 @@
       scrollbar-width:thin;
       -webkit-overflow-scrolling:touch;
     }
+
     .slide-up{animation:slideUp .6s cubic-bezier(.16,1,.3,1) forwards;}
     @keyframes slideUp{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
-    .pulse-slow{animation:pulseSlow 3s infinite;}
-    @keyframes pulseSlow{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}
 
     .btn-primary{
       background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%);
       color:#fff;
       font-size:1.125rem;
-      font-weight:600;
+      font-weight:800;
       padding:16px 20px;
       border-radius:16px;
       width:100%;
       text-align:center;
       transition:all .2s ease;
-      box-shadow:0 8px 20px -6px rgba(13,148,136,.4);
+      box-shadow:0 8px 20px -6px rgba(13,148,136,.35);
       border:none;
       cursor:pointer;
     }
-    .btn-primary:active{transform:scale(.96);box-shadow:0 4px 10px -4px rgba(13,148,136,.4)}
+    .btn-primary:active{transform:scale(.96)}
     .btn-primary:disabled{background:#cbd5e1;cursor:not-allowed;box-shadow:none;transform:none}
 
     .btn-secondary{
@@ -85,7 +84,7 @@
       border:2px solid rgba(13,148,136,.25);
       color:#0f766e;
       font-size:1.125rem;
-      font-weight:800;
+      font-weight:900;
       padding:16px 20px;
       border-radius:16px;
       width:100%;
@@ -109,7 +108,7 @@
       align-items:center;
       color:#334155;
       font-size:1.15rem;
-      font-weight:500;
+      font-weight:700;
       transition:all .2s;
       box-shadow:0 2px 4px rgba(0,0,0,.02);
     }
@@ -119,6 +118,24 @@
       color:var(--primary-dark);
       transform:scale(.99);
     }
+
+    .input-field{
+      width:100%;
+      padding:16px 18px;
+      border-radius:14px;
+      border:2px solid #e2e8f0;
+      background:#f8fafc;
+      font-size:18px;
+      outline:none;
+      transition:all .2s;
+      color:#0f172a;
+    }
+    .input-field:focus{
+      border-color:var(--primary);
+      background:#fff;
+      box-shadow:0 0 0 4px rgba(13,148,136,.10);
+    }
+    .input-field::placeholder{color:#94a3b8}
 
     .loader{
       border:3px solid #e2e8f0;
@@ -131,13 +148,17 @@
       vertical-align:middle;
     }
     @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+
     .hidden{display:none!important;}
 
-    #liff-status{font-size:1.1rem;font-weight:700;padding:14px 16px;border-radius:16px;}
-    #q-text{font-size:1.35rem;line-height:1.6;}
-    #view-landing h2{font-size:1.75rem;}
-    #view-landing p{font-size:1.1rem;}
+    #liff-status{
+      font-size:1.05rem;
+      font-weight:900;
+      padding:14px 16px;
+      border-radius:16px;
+    }
 
+    /* Result blocks */
     .result-block{
       background:#fff;
       border:1px solid rgba(13,148,136,.15);
@@ -147,65 +168,11 @@
       text-align:left;
     }
     .result-paragraph{font-size:1.05rem;color:#475569;line-height:1.7;}
-
-    /* Gift UI */
-    .gift-stage{
-      background:linear-gradient(180deg,#ffffff 0%, #ecfeff 100%);
-      border:1px solid rgba(13,148,136,.15);
-      border-radius:22px;
-      padding:18px;
-      box-shadow:0 12px 26px -20px rgba(13,148,136,.35);
-      position:relative;
-      overflow:hidden;
-    }
-    .sticker{
-      width:92px;height:92px; object-fit:contain;
-      transition:filter .2s ease, transform .2s ease;
-      filter:grayscale(100%) opacity(.55);
-    }
-    .sticker.active{
-      filter:grayscale(0%) opacity(1) drop-shadow(0 10px 18px rgba(0,0,0,.15));
-      transform:scale(1.05);
-    }
-    .sticker.flash{
-      animation:flashy .55s linear infinite;
-    }
-    @keyframes flashy{
-      0%{filter:grayscale(100%) opacity(.55)}
-      50%{filter:grayscale(0%) opacity(1) drop-shadow(0 0 18px rgba(245,158,11,.45))}
-      100%{filter:grayscale(100%) opacity(.55)}
-    }
-
-    .big-circle-btn{
-      width:170px;height:170px;border-radius:9999px;
-      display:flex;align-items:center;justify-content:center;
-      font-family:'Kanit',sans-serif;
-      font-weight:900;
-      font-size:1.2rem;
-      color:#fff;
-      background:radial-gradient(circle at 30% 30%, #34d399 0%, #0f766e 55%, #064e3b 100%);
-      box-shadow:0 18px 30px -18px rgba(13,148,136,.9);
-      border:6px solid rgba(255,255,255,.85);
-      transition:transform .12s ease, filter .2s ease;
-      user-select:none;
-    }
-    .big-circle-btn:active{transform:scale(.96)}
-    .big-circle-btn.disabled{
-      background:#cbd5e1; box-shadow:none; border-color:#e2e8f0;
-      color:#64748b; pointer-events:none; filter:grayscale(40%);
-    }
-
-    .mini-note{
-      font-size:.95rem;color:#475569;line-height:1.55;
-      background:#fff;border:1px solid rgba(2,132,199,.12);
-      border-radius:16px;padding:12px 14px;
-    }
   </style>
 </head>
 
 <body>
   <div class="glass-card">
-
     <!-- Header -->
     <div class="h-20 bg-gradient-to-r from-teal-700 to-teal-600 flex items-center justify-center text-white relative flex-shrink-0 shadow-md z-10 sm:rounded-t-2xl">
       <div class="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/medical-icons.png')]"></div>
@@ -218,52 +185,79 @@
     <!-- Content -->
     <div class="scroll-content" id="main-scroll">
 
-      <!-- STEP 1: Landing -->
-      <div id="view-landing" class="slide-up flex flex-col items-center justify-center min-h-[60vh] text-center space-y-8">
+      <!-- VIEW: Landing -->
+      <div id="view-landing" class="slide-up flex flex-col items-center justify-center min-h-[70vh] text-center space-y-6">
         <div class="relative">
           <div class="absolute inset-0 bg-teal-200 blur-2xl opacity-40 rounded-full animate-pulse"></div>
-          <div class="bg-white p-6 rounded-3xl shadow-xl relative pulse-slow border border-teal-50">
+          <div class="bg-white p-6 rounded-3xl shadow-xl relative border border-teal-50">
             <span class="text-6xl block">🧬</span>
           </div>
         </div>
 
         <div>
-          <h2 class="font-heading font-bold text-teal-900 mb-3">ค้นหาตัวตน...คนมีฝัน</h2>
-          <p class="text-gray-600 px-6 leading-relaxed">
-            ร่วมผจญภัยในโลกวิทยาศาสตร์สุขภาพ<br>เพื่อค้นหาอาชีพที่ใช่สำหรับคุณ!
+          <h2 class="font-heading font-extrabold text-teal-900 mb-2 text-3xl">ค้นหาตัวตน...คนมีฝัน</h2>
+          <p class="text-gray-600 px-6 leading-relaxed text-lg">
+            ตอบ 5 ข้อ แล้วดูผลลัพธ์ที่ใช่สำหรับคุณ ✨
           </p>
         </div>
 
-        <div class="w-full px-6 space-y-4">
-          <div id="liff-status" class="text-teal-700 bg-teal-50 py-2 px-4 rounded-xl flex items-center justify-center gap-2 border border-teal-100">
+        <div class="w-full px-3 space-y-4 text-left">
+          <div id="liff-status" class="text-teal-700 bg-teal-50 py-2 px-4 rounded-xl flex items-center justify-center gap-2 border border-teal-100 text-center">
             <span class="loader !border-teal-200 !border-t-teal-600 !w-4 !h-4"></span>
             กำลังเชื่อมต่อระบบ...
           </div>
 
+          <div class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm space-y-3">
+            <div class="font-heading font-extrabold text-slate-900 text-lg">ข้อมูลก่อนเริ่มเกม</div>
+
+            <label class="block">
+              <div class="text-sm font-extrabold text-slate-700 mb-1">ชื่อ</div>
+              <input id="inp-name" type="text" class="input-field" placeholder="พิมพ์ชื่อของคุณ" />
+            </label>
+
+            <div class="grid grid-cols-2 gap-3">
+              <label class="block">
+                <div class="text-sm font-extrabold text-slate-700 mb-1">อายุ</div>
+                <input id="inp-age" type="number" inputmode="numeric" min="1" max="120" class="input-field" placeholder="เช่น 16" />
+              </label>
+
+              <label class="block">
+                <div class="text-sm font-extrabold text-slate-700 mb-1">เพศ</div>
+                <select id="inp-gender" class="input-field">
+                  <option value="">เลือกเพศ</option>
+                  <option value="ชาย">ชาย</option>
+                  <option value="หญิง">หญิง</option>
+                  <option value="ไม่ระบุ">ไม่ระบุ</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
           <button id="btn-start" onclick="startQuiz()" class="btn-primary transform hover:-translate-y-1" disabled>
-            เริ่มค้นหาตัวตน 🚀
+            เริ่มเกม 🚀
           </button>
         </div>
       </div>
 
-      <!-- STEP 2: Quiz -->
+      <!-- VIEW: Quiz -->
       <div id="view-quiz" class="hidden slide-up h-full flex flex-col">
         <div class="flex justify-between items-center mb-8">
-          <span class="text-sm font-bold text-teal-700 bg-teal-50 px-3 py-1 rounded-lg border border-teal-100">
-            ข้อที่ <span id="q-num">1</span>/<span id="q-total">7</span>
+          <span class="text-sm font-extrabold text-teal-700 bg-teal-50 px-3 py-1 rounded-lg border border-teal-100">
+            ข้อที่ <span id="q-num">1</span>/5
           </span>
           <div class="w-32 h-2 bg-gray-100 rounded-full overflow-hidden">
             <div id="progress-bar" class="h-full bg-teal-500 transition-all duration-500 ease-out" style="width:20%"></div>
           </div>
         </div>
 
-        <h3 id="q-text" class="font-heading font-bold text-gray-800 mb-8 text-center min-h-[4rem] flex items-center justify-center">...</h3>
+        <h3 id="q-text" class="font-heading font-extrabold text-gray-800 mb-8 text-center min-h-[4rem] flex items-center justify-center text-2xl leading-relaxed">
+          ...
+        </h3>
         <div id="q-answers" class="space-y-3 pb-6"></div>
       </div>
 
-      <!-- STEP 3: Result -->
+      <!-- VIEW: Result -->
       <div id="view-result" class="hidden slide-up">
-
         <div class="text-center mb-6 bg-gradient-to-b from-white to-teal-50 p-6 rounded-2xl border border-teal-100 shadow-sm">
           <div class="inline-block relative mb-3">
             <div class="absolute inset-0 bg-yellow-200 rounded-full blur-xl opacity-50"></div>
@@ -272,7 +266,7 @@
 
           <p class="text-sm font-extrabold text-teal-700 tracking-wide mb-2">คุณคือ...</p>
           <h2 id="res-title" class="font-heading text-3xl font-extrabold text-gray-900 mb-2">...</h2>
-          <p id="res-en" class="text-lg font-bold text-teal-700 mb-4">...</p>
+          <p id="res-en" class="text-lg font-extrabold text-teal-700 mb-4">...</p>
 
           <div class="result-block mt-4">
             <p id="res-desc" class="result-paragraph">...</p>
@@ -294,80 +288,27 @@
                   หลักสูตรของเราเหมาะกับคุณสุดๆ ลองสอบถามพี่ Staff เพิ่มเติมได้เลย!
                 </div>
               </div>
-
-              <div class="mini-note">
-                <div class="font-heading font-extrabold text-slate-800 mb-1">🧩 เก็บสถิติแบบไม่ระบุตัวตน</div>
-                ระบบจะบันทึกคำตอบและผลลัพธ์เพื่อสรุปภาพรวมกิจกรรม (ไม่มีการแสดงข้อมูลส่วนตัวต่อสาธารณะ)
-              </div>
             </div>
           </div>
         </div>
 
-        <!-- Buttons Panel (3 buttons + OA) -->
+        <!-- 3 Buttons -->
         <div id="result-actions" class="space-y-3 pb-4">
-          <button type="button" class="btn-secondary" onclick="restartQuiz()">
-            🔁 เล่นใหม่อีกครั้ง
-          </button>
-
-          <button type="button" id="btn-gift" class="btn-primary" onclick="openGift()">
-            🎁 ลุ้นรางวัล
+          <button type="button" class="btn-secondary" onclick="restartToLanding()">
+            🔁 เล่นเกมใหม่
           </button>
 
           <button type="button" class="btn-primary" onclick="openCertificateFormExternal()">
             🏆 รับเกียรติบัตร
           </button>
 
-          <button onclick="goOA()" class="w-full bg-[#06C755] hover:bg-[#05b54d] text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-3 text-lg transition-transform hover:scale-105 active:scale-95">
+          <button type="button" onclick="goOA()" class="w-full bg-[#06C755] hover:bg-[#05b54d] text-white font-extrabold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-3 text-lg transition-transform hover:scale-105 active:scale-95">
             <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 16 16">
               <path d="M8 0c4.411 0 8 2.912 8 6.492 0 1.433-.555 2.723-1.715 3.994-1.675 1.139-2.225 1.393-2.565 2.43-.099.301-.585.517-.676.126-.142-.614-.85-2.028-1.576-2.617C1.49 10.42 0 8.448 0 6.492 0 2.912 3.59 0 8 0"/>
             </svg>
-            ไปที่ LINE OA
+            กลับไป LINE OA
           </button>
         </div>
-      </div>
-
-      <!-- STEP 4: Gift -->
-      <div id="view-gift" class="hidden slide-up">
-        <div class="gift-stage">
-          <div class="text-center mb-3">
-            <div class="text-sm font-extrabold text-teal-700">🎁 ลุ้นของรางวัล</div>
-            <div class="font-heading text-2xl font-extrabold text-slate-900 mt-1" id="gift-title">สวัสดี!</div>
-            <div class="text-slate-600 mt-1" id="gift-sub">...</div>
-          </div>
-
-          <div class="flex items-center justify-between gap-3 mt-4">
-            <img id="sticker-left" class="sticker" src="assets/success.png" alt="success">
-            <div class="flex flex-col items-center justify-center flex-1">
-              <div id="gift-btn" class="big-circle-btn" onclick="drawGift()">
-                กดลุ้น<br>ตอนนี้!
-              </div>
-              <div id="gift-hint" class="text-xs text-slate-500 mt-2 text-center">
-                (สำหรับผู้ที่ล็อกอิน LINE เท่านั้น)
-              </div>
-            </div>
-            <img id="sticker-right" class="sticker" src="assets/fail.png" alt="fail">
-          </div>
-
-          <div id="gift-message" class="mini-note mt-5">
-            กำลังตรวจสอบสิทธิ์...
-          </div>
-
-          <div class="mt-4 space-y-3">
-            <button type="button" class="btn-primary" onclick="openCertificateFormExternal()">
-              🏆 รับเกียรติบัตร
-            </button>
-            <button type="button" onclick="goOA()" class="w-full bg-[#06C755] hover:bg-[#05b54d] text-white font-bold py-4 rounded-2xl shadow-lg flex items-center justify-center gap-3 text-lg transition-transform hover:scale-105 active:scale-95">
-              <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M8 0c4.411 0 8 2.912 8 6.492 0 1.433-.555 2.723-1.715 3.994-1.675 1.139-2.225 1.393-2.565 2.43-.099.301-.585.517-.676.126-.142-.614-.85-2.028-1.576-2.617C1.49 10.42 0 8.448 0 6.492 0 2.912 3.59 0 8 0"/>
-              </svg>
-              ไปที่ LINE OA
-            </button>
-            <button type="button" class="btn-secondary" onclick="backToResult()">
-              ← กลับไปดูผลลัพธ์
-            </button>
-          </div>
-        </div>
-      </div>
 
     </div>
   </div>

@@ -1,22 +1,8 @@
-/**
- * The Future Compass - Backend (Google Apps Script Web App)
- * Script Properties required:
- * - SHEET_ID
- * Optional:
- * - LINE_CHANNEL_ACCESS_TOKEN
- */
-
 const SHEET_NAME = "Sheet1";
-const INDEX_SHEET_LAST = "LastAttemptIndex";
-const INDEX_SHEET_SESS = "SessionIndex";
 
-let _ss = null, _shMain = null, _shLast = null, _shSess = null;
-
-/* =========================
- * Entry points
- * ========================= */
-function doGet() {
-  return ContentService.createTextOutput("OK The Future Compass WebApp")
+function doGet(e) {
+  return ContentService
+    .createTextOutput("OK The Future Compass WebApp")
     .setMimeType(ContentService.MimeType.TEXT);
 }
 
@@ -31,32 +17,24 @@ function doPost(e) {
       const report = healthCheck_();
       return json_({ status: "ok", report, now: new Date().toISOString() });
     }
-
     if (action === "reserve_session") {
       const code = reserveSessionCode_();
       return json_({ status: "ok", sessionCode: code });
     }
-
     if (action === "session_exists") {
       const code = String(data.sessionCode || "").trim();
       const exists = code ? sessionExists_(code) : false;
       return json_({ status: "ok", exists });
     }
-
     if (action === "quiz_complete") {
       const used = appendQuizRow_(data);
-
-      // OA push (do NOT break logging)
       try { sendResultViaOA_(data, used); } catch (err) { console.log("OA send failed:", err); }
-
       return json_({ status: "ok", sessionCode: used });
     }
-
     if (action === "certificate_click") {
       const used = markCertificateClick_(data);
       return json_({ status: "ok", sessionCode: used });
     }
-
     if (action === "get_last_attempt") {
       const userId = String(data.userId || "").trim();
       const rec = userId ? getLastAttemptByUserId_(userId) : null;
@@ -69,9 +47,6 @@ function doPost(e) {
   }
 }
 
-/* =========================
- * Properties
- * ========================= */
 function getRequiredProp_(key) {
   const v = PropertiesService.getScriptProperties().getProperty(key);
   const s = String(v || "").trim();
@@ -80,25 +55,18 @@ function getRequiredProp_(key) {
 }
 function getOptionalProp_(key) {
   const v = PropertiesService.getScriptProperties().getProperty(key);
-  const s = String(v || "").trim();
-  return s || "";
+  return String(v || "").trim();
 }
 
-/* =========================
- * Health check
- * ========================= */
 function healthCheck_() {
   const report = {
     sheetIdPresent: false,
     sheetOpenOk: false,
     sheetName: SHEET_NAME,
     headerOk: false,
-    indexLastOk: false,
-    indexSessOk: false,
     lineTokenPresent: false,
     errors: []
   };
-
   try {
     const sheetId = getRequiredProp_("SHEET_ID");
     report.sheetIdPresent = true;
@@ -107,16 +75,8 @@ function healthCheck_() {
     report.sheetOpenOk = true;
 
     const sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
-    ensureHeaderMain_(sh);
+    ensureHeader_(sh);
     report.headerOk = true;
-
-    const shLast = ss.getSheetByName(INDEX_SHEET_LAST) || ss.insertSheet(INDEX_SHEET_LAST);
-    ensureHeaderLast_(shLast);
-    report.indexLastOk = true;
-
-    const shSess = ss.getSheetByName(INDEX_SHEET_SESS) || ss.insertSheet(INDEX_SHEET_SESS);
-    ensureHeaderSess_(shSess);
-    report.indexSessOk = true;
   } catch (e) {
     report.errors.push("Sheet error: " + asErrMsg_(e));
   }
@@ -131,87 +91,27 @@ function healthCheck_() {
   return report;
 }
 
-/* =========================
- * Sheet getters (cached per execution)
- * ========================= */
-function getSpreadsheet_() {
-  if (_ss) return _ss;
+function getSheet_() {
   const sheetId = getRequiredProp_("SHEET_ID");
-  _ss = SpreadsheetApp.openById(sheetId);
-  return _ss;
+  const ss = SpreadsheetApp.openById(sheetId);
+  const sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+  ensureHeader_(sh);
+  return sh;
 }
 
-function getMainSheet_() {
-  if (_shMain) return _shMain;
-  const ss = getSpreadsheet_();
-  _shMain = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
-  ensureHeaderMain_(_shMain);
-  return _shMain;
-}
-
-function getLastIndexSheet_() {
-  if (_shLast) return _shLast;
-  const ss = getSpreadsheet_();
-  _shLast = ss.getSheetByName(INDEX_SHEET_LAST) || ss.insertSheet(INDEX_SHEET_LAST);
-  ensureHeaderLast_(_shLast);
-  return _shLast;
-}
-
-function getSessIndexSheet_() {
-  if (_shSess) return _shSess;
-  const ss = getSpreadsheet_();
-  _shSess = ss.getSheetByName(INDEX_SHEET_SESS) || ss.insertSheet(INDEX_SHEET_SESS);
-  ensureHeaderSess_(_shSess);
-  return _shSess;
-}
-
-/* =========================
- * Headers
- * ========================= */
-function ensureHeaderMain_(sh) {
+function ensureHeader_(sh) {
   if (sh.getLastRow() === 0) {
     sh.appendRow([
-      "tsServer",
-      "sessionCode",
-      "certificateClick",
-      "certificateClickAt",
-      "name", "age", "gender",
-      "a1", "a2", "a3", "a4", "a5",
-      "resultType", "resultTH", "resultEN",
+      "tsServer","sessionCode","certificateClick","certificateClickAt",
+      "name","age","gender",
+      "a1","a2","a3","a4","a5",
+      "resultType","resultTH","resultEN",
       "userId",
-      "profileJson", "liffJson", "clientJson", "answersJson"
+      "profileJson","liffJson","clientJson","answersJson"
     ]);
   }
 }
 
-function ensureHeaderLast_(sh) {
-  if (sh.getLastRow() === 0) {
-    sh.appendRow([
-      "userId",
-      "mainRowNum",
-      "tsServer",
-      "sessionCode",
-      "certificateClick",
-      "certificateClickAt",
-      "name", "age", "gender",
-      "resultType", "resultTH", "resultEN"
-    ]);
-  }
-}
-
-function ensureHeaderSess_(sh) {
-  if (sh.getLastRow() === 0) {
-    sh.appendRow([
-      "sessionCode",
-      "mainRowNum",
-      "tsServer"
-    ]);
-  }
-}
-
-/* =========================
- * Session unique (fast via SessionIndex + cache, fallback to main scan)
- * ========================= */
 function genSessionCode_() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let s = "";
@@ -220,44 +120,19 @@ function genSessionCode_() {
 }
 
 function sessionExists_(code) {
-  const norm = String(code || "").trim();
-  if (!norm) return false;
-
+  const key = ("tfc_sess_" + code).toLowerCase();
   const cache = CacheService.getScriptCache();
-  const key = ("tfc_sess_" + norm).toLowerCase();
+  if (cache.get(key) === "1") return true;
 
-  const cached = cache.get(key);
-  if (cached === "1") return true;
-
-  // 1) Fast lookup from SessionIndex
-  const shSess = getSessIndexSheet_();
-  const last = shSess.getLastRow();
-  if (last >= 2) {
-    const found = shSess.getRange(2, 1, last - 1, 1)
-      .createTextFinder(norm).matchEntireCell(true).findNext();
-    if (found) {
-      cache.put(key, "1", 60 * 60);
-      return true;
-    }
-  }
-
-  // 2) Fallback: scan main sheet (only if SessionIndex doesn't have old data)
-  const sh = getMainSheet_();
+  const sh = getSheet_();
   const lastRow = sh.getLastRow();
   if (lastRow < 2) return false;
 
-  const foundMain = sh.getRange(2, 2, lastRow - 1, 1)
-    .createTextFinder(norm).matchEntireCell(true).findNext();
+  const found = sh.getRange(2, 2, lastRow - 1, 1)
+    .createTextFinder(code).matchEntireCell(true).findNext();
 
-  const exists = !!foundMain;
-  if (exists) {
-    cache.put(key, "1", 60 * 60);
-    // backfill SessionIndex (best effort)
-    try {
-      const rowNum = foundMain.getRow();
-      shSess.appendRow([norm, rowNum, new Date()]);
-    } catch (_) {}
-  }
+  const exists = !!found;
+  if (exists) cache.put(key, "1", 60 * 60);
   return exists;
 }
 
@@ -265,7 +140,7 @@ function reserveSessionCode_() {
   const lock = LockService.getScriptLock();
   lock.waitLock(8000);
   try {
-    for (let i = 0; i < 80; i++) {
+    for (let i = 0; i < 60; i++) {
       const code = genSessionCode_();
       if (!sessionExists_(code)) {
         CacheService.getScriptCache().put(("tfc_sess_" + code).toLowerCase(), "1", 60 * 60);
@@ -280,67 +155,37 @@ function reserveSessionCode_() {
   }
 }
 
-/* =========================
- * Append quiz (also update indexes)
- * ========================= */
 function appendQuizRow_(d) {
   const lock = LockService.getScriptLock();
   lock.waitLock(8000);
   try {
-    const sh = getMainSheet_();
-    const shSess = getSessIndexSheet_();
-
+    const sh = getSheet_();
     let code = String(d.sessionCode || "").trim();
     if (!code || sessionExists_(code)) code = reserveSessionCode_();
 
     sh.appendRow([
-      new Date(),
-      code,
-      Number(d.certificateClick || 0),
-      "",
-
-      d.name || "",
-      d.age || "",
-      d.gender || "",
-
+      new Date(), code, Number(d.certificateClick || 0), "",
+      d.name || "", d.age || "", d.gender || "",
       (d.answers && d.answers[0]) || "",
       (d.answers && d.answers[1]) || "",
       (d.answers && d.answers[2]) || "",
       (d.answers && d.answers[3]) || "",
       (d.answers && d.answers[4]) || "",
-
-      d.resultType || "",
-      d.resultTH || "",
-      d.resultEN || "",
-
+      d.resultType || "", d.resultTH || "", d.resultEN || "",
       String(d.userId || ""),
-
       JSON.stringify(d.profile || null),
       JSON.stringify(d.liffInfo || {}),
       JSON.stringify(d.client || {}),
       JSON.stringify(d.answers || [])
     ]);
 
-    const mainRowNum = sh.getLastRow();
-
-    // Update SessionIndex (append-only)
-    try { shSess.appendRow([code, mainRowNum, new Date()]); } catch (_) {}
-
-    // Cache session exists
     CacheService.getScriptCache().put(("tfc_sess_" + code).toLowerCase(), "1", 60 * 60);
-
-    // Update LastAttemptIndex (upsert)
-    try { upsertLastAttemptIndex_(d, code, mainRowNum); } catch (e) { console.log("upsertLastAttemptIndex failed:", e); }
-
     return code;
   } finally {
     lock.releaseLock();
   }
 }
 
-/* =========================
- * Certificate click mark (fast path using userId->rowNum index)
- * ========================= */
 function markCertificateClick_(d) {
   const code = String(d.sessionCode || "").trim();
   if (!code) throw new Error("Missing sessionCode");
@@ -348,27 +193,7 @@ function markCertificateClick_(d) {
   const lock = LockService.getScriptLock();
   lock.waitLock(8000);
   try {
-    const sh = getMainSheet_();
-
-    // 1) Fast path: if userId exists and index has rowNum, update directly
-    const userId = String(d.userId || "").trim();
-    if (userId) {
-      const idx = getLastAttemptByUserId_(userId);
-      const rowNum = Number(idx && idx.mainRowNum);
-      if (rowNum && rowNum >= 2) {
-        // ensure it matches sessionCode to be safe
-        const sessCell = String(sh.getRange(rowNum, 2).getValue() || "").trim();
-        if (sessCell === code) {
-          sh.getRange(rowNum, 3).setValue(1);
-          sh.getRange(rowNum, 4).setValue(new Date());
-          // also update index + cache
-          try { upsertLastAttemptIndex_(d, code, rowNum, { cert: true }); } catch (_) {}
-          return code;
-        }
-      }
-    }
-
-    // 2) Fallback: scan by sessionCode (old behavior)
+    const sh = getSheet_();
     const lastRow = sh.getLastRow();
     if (lastRow < 2) throw new Error("Sheet is empty");
 
@@ -381,115 +206,12 @@ function markCertificateClick_(d) {
 
     sh.getRange(foundRow, 3).setValue(1);
     sh.getRange(foundRow, 4).setValue(new Date());
-
-    // best-effort update index by userId
-    try { if (userId) upsertLastAttemptIndex_(d, code, foundRow, { cert: true }); } catch (_) {}
-
     return code;
   } finally {
     lock.releaseLock();
   }
 }
 
-/* =========================
- * Last attempt index (FAST)
- * ========================= */
-function getLastAttemptByUserId_(userId) {
-  const uid = String(userId || "").trim();
-  if (!uid) return null;
-
-  // cache
-  const cache = CacheService.getScriptCache();
-  const key = ("tfc_last_" + uid).toLowerCase();
-  const cached = cache.get(key);
-  if (cached) {
-    try { return JSON.parse(cached); } catch (_) {}
-  }
-
-  const shLast = getLastIndexSheet_();
-  const last = shLast.getLastRow();
-  if (last < 2) return null;
-
-  const found = shLast.getRange(2, 1, last - 1, 1)
-    .createTextFinder(uid).matchEntireCell(true).findNext();
-  if (!found) return null;
-
-  const r = found.getRow();
-  const row = shLast.getRange(r, 1, 1, 12).getValues()[0];
-
-  const rec = {
-    userId: row[0],
-    mainRowNum: row[1],
-    tsServer: row[2],
-    sessionCode: row[3],
-    certificateClick: row[4],
-    certificateClickAt: row[5],
-    name: row[6],
-    age: row[7],
-    gender: row[8],
-    resultType: row[9],
-    resultTH: row[10],
-    resultEN: row[11],
-  };
-
-  cache.put(key, JSON.stringify(rec), 10 * 60); // 10 minutes
-  return rec;
-}
-
-function upsertLastAttemptIndex_(d, sessionCode, mainRowNum, opts) {
-  const o = opts || {};
-  const userId = String(d.userId || "").trim();
-  if (!userId) return;
-
-  const shLast = getLastIndexSheet_();
-  const last = shLast.getLastRow();
-
-  const now = new Date();
-  const rec = [
-    userId,
-    Number(mainRowNum || 0) || "",
-    now,
-    String(sessionCode || "").trim(),
-    o.cert ? 1 : Number(d.certificateClick || 0),
-    o.cert ? now : "",
-    d.name || "",
-    d.age || "",
-    d.gender || "",
-    d.resultType || "",
-    d.resultTH || "",
-    d.resultEN || "",
-  ];
-
-  let foundRow = -1;
-  if (last >= 2) {
-    const found = shLast.getRange(2, 1, last - 1, 1)
-      .createTextFinder(userId).matchEntireCell(true).findNext();
-    if (found) foundRow = found.getRow();
-  }
-
-  if (foundRow === -1) shLast.appendRow(rec);
-  else shLast.getRange(foundRow, 1, 1, 12).setValues([rec]);
-
-  // update cache
-  CacheService.getScriptCache().put(("tfc_last_" + userId).toLowerCase(), JSON.stringify({
-    userId,
-    mainRowNum: rec[1],
-    tsServer: rec[2],
-    sessionCode: rec[3],
-    certificateClick: rec[4],
-    certificateClickAt: rec[5],
-    name: rec[6],
-    age: rec[7],
-    gender: rec[8],
-    resultType: rec[9],
-    resultTH: rec[10],
-    resultEN: rec[11],
-  }), 10 * 60);
-}
-
-/* =========================
- * OA Push (unchanged, just safer)
- * ========================= */
 function getLineToken_() {
   return getOptionalProp_("LINE_CHANNEL_ACCESS_TOKEN");
 }
@@ -510,12 +232,7 @@ function sendResultViaOA_(d, sessionCode) {
 
   pushLine_(token, userId, [
     msgFlex,
-    {
-      type: "text",
-      text:
-        `ขอบคุณที่ร่วมสนุกนะครับ 😊\n` +
-        `อยากรับเกียรติบัตร 🏆 กลับไปที่หน้าเกม แล้วกด “รับเกียรติบัตร” ได้เลยครับ`
-    }
+    { type: "text", text: `ขอบคุณที่ร่วมสนุกนะครับ 😊\nถ้าอยากรับเกียรติบัตร 🏆 ให้กลับไปที่หน้าเกม แล้วกดปุ่ม “รับเกียรติบัตร” ได้เลยครับ` }
   ]);
 }
 
@@ -585,9 +302,36 @@ function pushLine_(token, to, messages) {
   if (code < 200 || code >= 300) throw new Error("LINE push failed: HTTP " + code + " " + res.getContentText());
 }
 
-/* =========================
- * Utils
- * ========================= */
+function getLastAttemptByUserId_(userId) {
+  const sh = getSheet_();
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return null;
+
+  const COL_USERID = 16;
+  const userVals = sh.getRange(2, COL_USERID, lastRow - 1, 1).getValues();
+
+  let foundRow = -1;
+  for (let i = userVals.length - 1; i >= 0; i--) {
+    if (String(userVals[i][0] || "").trim() === userId) { foundRow = i + 2; break; }
+  }
+  if (foundRow === -1) return null;
+
+  const row = sh.getRange(foundRow, 1, 1, 16).getValues()[0];
+  return {
+    tsServer: row[0],
+    sessionCode: row[1],
+    certificateClick: row[2],
+    certificateClickAt: row[3],
+    name: row[4],
+    age: row[5],
+    gender: row[6],
+    resultType: row[12],
+    resultTH: row[13],
+    resultEN: row[14],
+    userId: row[15],
+  };
+}
+
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);

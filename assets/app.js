@@ -1,5 +1,9 @@
 // web/assets/app.js
-const { LIFF_ID, GAS_WEBAPP_URL, OA_URL, CERT_GOOGLE_FORM_URL } = window.APP_CONFIG;
+const CFG = (window.APP_CONFIG && typeof window.APP_CONFIG === "object") ? window.APP_CONFIG : {};
+const LIFF_ID = String(CFG.LIFF_ID || "");
+const GAS_WEBAPP_URL = String(CFG.GAS_WEBAPP_URL || "");
+const OA_URL = String(CFG.OA_URL || "");
+const CERT_GOOGLE_FORM_URL = String(CFG.CERT_GOOGLE_FORM_URL || "");
 
 let liffInfo = { os:"", lang:"", version:"", isInClient:false, isLoggedIn:false };
 let lineProfile = null;
@@ -38,17 +42,23 @@ function buildClientMeta() {
 }
 
 /* ---------- Backend helper (with retry) ---------- */
-async function callBackend_(action, data, { retries = 2 } = {}) {
+async function callBackend_(action, data, { retries = 2, timeoutMs = 12000 } = {}) {
+  if (!GAS_WEBAPP_URL) throw new Error("Missing GAS_WEBAPP_URL in APP_CONFIG");
+
   const payload = { action, data };
   let lastErr = null;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+
     try {
       const res = await fetch(GAS_WEBAPP_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" }, // no-preflight
         body: JSON.stringify(payload),
         cache: "no-store",
+        signal: ctrl.signal
       });
 
       let out = null;
@@ -56,8 +66,11 @@ async function callBackend_(action, data, { retries = 2 } = {}) {
 
       if (!out) throw new Error(`Backend non-JSON (HTTP ${res.status})`);
       if (out.status === "error") throw new Error(out.message || "Backend error");
+
+      clearTimeout(timer);
       return out;
     } catch (e) {
+      clearTimeout(timer);
       lastErr = e;
       await new Promise(r => setTimeout(r, 250));
     }
@@ -254,27 +267,29 @@ async function loadLastAttemptForLine_() {
 
 /* ---------- Boot ---------- */
 window.addEventListener("DOMContentLoaded", async () => {
+  // if config missing -> show clear message (still playable, but no sheet logging)
+  if (!GAS_WEBAPP_URL) {
+    setStatus(false, "⚠️ ไม่พบ config.js หรือ APP_CONFIG (เกมยังเล่นได้ แต่จะไม่บันทึกชีท)");
+  }
+
   $("inp-name").addEventListener("input", validateLanding_);
   $("inp-age").addEventListener("input", validateLanding_);
   $("inp-gender").addEventListener("change", validateLanding_);
 
+  // IMPORTANT: validate immediately so start button updates
+  validateLanding_();
+
   await initLiffSafe_();
 
-  // health check (ช่วยบอก “เชื่อมต่อชีทไม่สำเร็จ”)
-  try {
-    await callBackend_("health", {});
-  } catch (e) {
-    console.error("health failed:", e);
-    setStatus(false, "⚠️ เชื่อมต่อชีทไม่สำเร็จ (ตรวจ Deploy/URL ของ GAS)");
+  // backend calls should not block gameplay
+  if (GAS_WEBAPP_URL) {
+    try { await callBackend_("health", {}); }
+    catch (e) { console.error("health failed:", e); setStatus(false, "⚠️ เชื่อมต่อชีทไม่สำเร็จ (ตรวจ Deploy/URL ของ GAS)"); }
+
+    try { await ensureUniqueSessionCode_(); } catch (e) { console.warn("reserve session failed:", e); }
+
+    await loadLastAttemptForLine_();
   }
-
-  // reserve session (สำหรับคนใหม่)
-  try { await ensureUniqueSessionCode_(); } catch (e) { console.warn("reserve session failed:", e); }
-
-  // ✅ NEW: ถ้าเป็น LINE และเคยเล่นแล้ว -> เติมข้อมูล + โชว์ปุ่มรับเกียรติบัตรหน้าแรก
-  await loadLastAttemptForLine_();
-
-  validateLanding_();
 });
 
 /* ---------- Quiz flow ---------- */

@@ -1,8 +1,7 @@
 const SHEET_NAME = "Sheet1";
 
-function doGet(e) {
-  return ContentService
-    .createTextOutput("OK The Future Compass WebApp")
+function doGet() {
+  return ContentService.createTextOutput("OK The Future Compass WebApp")
     .setMimeType(ContentService.MimeType.TEXT);
 }
 
@@ -17,28 +16,16 @@ function doPost(e) {
       const report = healthCheck_();
       return json_({ status: "ok", report, now: new Date().toISOString() });
     }
-    if (action === "reserve_session") {
-      const code = reserveSessionCode_();
-      return json_({ status: "ok", sessionCode: code });
-    }
-    if (action === "session_exists") {
-      const code = String(data.sessionCode || "").trim();
-      const exists = code ? sessionExists_(code) : false;
-      return json_({ status: "ok", exists });
-    }
+
     if (action === "quiz_complete") {
-      const used = appendQuizRow_(data);
-      try { sendResultViaOA_(data, used); } catch (err) { console.log("OA send failed:", err); }
-      return json_({ status: "ok", sessionCode: used });
+      const rowNum = appendQuizRowFast_(data);
+      try { sendResultViaOA_(data, rowNum); } catch (err) { console.log("OA send failed:", err); }
+      return json_({ status: "ok", rowNum });
     }
+
     if (action === "certificate_click") {
-      const used = markCertificateClick_(data);
-      return json_({ status: "ok", sessionCode: used });
-    }
-    if (action === "get_last_attempt") {
-      const userId = String(data.userId || "").trim();
-      const rec = userId ? getLastAttemptByUserId_(userId) : null;
-      return json_({ status: "ok", found: !!rec, record: rec });
+      appendCertificateClickFast_(data);
+      return json_({ status: "ok" });
     }
 
     return json_({ status: "error", message: "Unknown action: " + action });
@@ -47,6 +34,9 @@ function doPost(e) {
   }
 }
 
+/* =========================
+ * Properties
+ * ========================= */
 function getRequiredProp_(key) {
   const v = PropertiesService.getScriptProperties().getProperty(key);
   const s = String(v || "").trim();
@@ -58,165 +48,182 @@ function getOptionalProp_(key) {
   return String(v || "").trim();
 }
 
-function healthCheck_() {
-  const report = {
-    sheetIdPresent: false,
-    sheetOpenOk: false,
-    sheetName: SHEET_NAME,
-    headerOk: false,
-    lineTokenPresent: false,
-    errors: []
-  };
-  try {
-    const sheetId = getRequiredProp_("SHEET_ID");
-    report.sheetIdPresent = true;
-
-    const ss = SpreadsheetApp.openById(sheetId);
-    report.sheetOpenOk = true;
-
-    const sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
-    ensureHeader_(sh);
-    report.headerOk = true;
-  } catch (e) {
-    report.errors.push("Sheet error: " + asErrMsg_(e));
-  }
-
-  try {
-    const token = getOptionalProp_("LINE_CHANNEL_ACCESS_TOKEN");
-    report.lineTokenPresent = !!token;
-  } catch (e) {
-    report.errors.push("Token error: " + asErrMsg_(e));
-  }
-
-  return report;
-}
-
+/* =========================
+ * Sheet helpers
+ * ========================= */
 function getSheet_() {
   const sheetId = getRequiredProp_("SHEET_ID");
   const ss = SpreadsheetApp.openById(sheetId);
   const sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
-  ensureHeader_(sh);
+  ensureHeaderFast_(sh);
   return sh;
 }
 
-function ensureHeader_(sh) {
-  if (sh.getLastRow() === 0) {
-    sh.appendRow([
-      "tsServer","sessionCode","certificateClick","certificateClickAt",
-      "name","age","gender",
-      "a1","a2","a3","a4","a5",
-      "resultType","resultTH","resultEN",
-      "userId",
-      "profileJson","liffJson","clientJson","answersJson"
-    ]);
+function ensureHeaderFast_(sh) {
+  if (sh.getLastRow() !== 0) return;
+
+  sh.appendRow([
+    "tsServer",
+    "rowId",                // from client runId
+    "eventType",            // "quiz_complete" or "certificate_click"
+    "certificateClick",     // 0/1
+    "certificateClickAt",
+
+    "name","age","gender",
+
+    "a1","a2","a3","a4","a5",
+
+    "resultType","resultTH","resultEN",
+
+    "userId",               // from client payload
+
+    // extracted from profile
+    "lineUserId","lineDisplayName","linePictureUrl",
+
+    // extracted from liff
+    "liffOs","liffLang","liffVersion","liffIsInClient","liffIsLoggedIn",
+
+    // raw json (keep)
+    "profileJson","liffJson","clientJson","answersJson"
+  ]);
+}
+
+/* =========================
+ * Parse helpers
+ * ========================= */
+function parseJsonSafe_(v) {
+  try {
+    if (v === null || v === undefined) return null;
+    if (typeof v === "object") return v; // already object
+    const s = String(v || "").trim();
+    if (!s) return null;
+    if (s[0] !== "{" && s[0] !== "[") return null;
+    return JSON.parse(s);
+  } catch (_) {
+    return null;
   }
 }
-
-function genSessionCode_() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let s = "";
-  for (let i = 0; i < 5; i++) s += chars[Math.floor(Math.random() * chars.length)];
-  return s;
+function boolCell_(v) {
+  if (v === true) return true;
+  if (v === false) return false;
+  const s = String(v || "").toLowerCase().trim();
+  if (s === "true") return true;
+  if (s === "false") return false;
+  return "";
 }
+function safeStr_(v) { return (v === null || v === undefined) ? "" : String(v); }
 
-function sessionExists_(code) {
-  const key = ("tfc_sess_" + code).toLowerCase();
-  const cache = CacheService.getScriptCache();
-  if (cache.get(key) === "1") return true;
-
+/* =========================
+ * Actions (FAST)
+ * ========================= */
+function appendQuizRowFast_(d) {
   const sh = getSheet_();
-  const lastRow = sh.getLastRow();
-  if (lastRow < 2) return false;
 
-  const found = sh.getRange(2, 2, lastRow - 1, 1)
-    .createTextFinder(code).matchEntireCell(true).findNext();
+  const profileObj = d.profile || parseJsonSafe_(d.profileJson);
+  const liffObj = d.liffInfo || parseJsonSafe_(d.liffJson);
 
-  const exists = !!found;
-  if (exists) cache.put(key, "1", 60 * 60);
-  return exists;
+  const lineUserId = safeStr_(profileObj && profileObj.userId);
+  const lineDisplayName = safeStr_(profileObj && profileObj.displayName);
+  const linePictureUrl = safeStr_(profileObj && profileObj.pictureUrl);
+
+  const liffOs = safeStr_(liffObj && liffObj.os);
+  const liffLang = safeStr_(liffObj && liffObj.lang);
+  const liffVersion = safeStr_(liffObj && liffObj.version);
+  const liffIsInClient = boolCell_(liffObj && liffObj.isInClient);
+  const liffIsLoggedIn = boolCell_(liffObj && liffObj.isLoggedIn);
+
+  const answers = Array.isArray(d.answers) ? d.answers : [];
+
+  sh.appendRow([
+    new Date(),
+    safeStr_(d.rowId),
+    "quiz_complete",
+    0,
+    "",
+
+    d.name || "",
+    d.age || "",
+    d.gender || "",
+
+    answers[0] || "",
+    answers[1] || "",
+    answers[2] || "",
+    answers[3] || "",
+    answers[4] || "",
+
+    d.resultType || "",
+    d.resultTH || "",
+    d.resultEN || "",
+
+    safeStr_(d.userId),
+
+    lineUserId, lineDisplayName, linePictureUrl,
+
+    liffOs, liffLang, liffVersion, liffIsInClient, liffIsLoggedIn,
+
+    JSON.stringify(profileObj || null),
+    JSON.stringify(liffObj || {}),
+    JSON.stringify(d.client || {}),
+    JSON.stringify(answers || [])
+  ]);
+
+  return sh.getLastRow();
 }
 
-function reserveSessionCode_() {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(8000);
-  try {
-    for (let i = 0; i < 60; i++) {
-      const code = genSessionCode_();
-      if (!sessionExists_(code)) {
-        CacheService.getScriptCache().put(("tfc_sess_" + code).toLowerCase(), "1", 60 * 60);
-        return code;
-      }
-    }
-    const fallback = "X" + String(Date.now()).slice(-4);
-    CacheService.getScriptCache().put(("tfc_sess_" + fallback).toLowerCase(), "1", 60 * 60);
-    return fallback;
-  } finally {
-    lock.releaseLock();
-  }
+function appendCertificateClickFast_(d) {
+  const sh = getSheet_();
+
+  const profileObj = d.profile || parseJsonSafe_(d.profileJson);
+  const liffObj = d.liffInfo || parseJsonSafe_(d.liffJson);
+
+  const lineUserId = safeStr_(profileObj && profileObj.userId);
+  const lineDisplayName = safeStr_(profileObj && profileObj.displayName);
+  const linePictureUrl = safeStr_(profileObj && profileObj.pictureUrl);
+
+  const liffOs = safeStr_(liffObj && liffObj.os);
+  const liffLang = safeStr_(liffObj && liffObj.lang);
+  const liffVersion = safeStr_(liffObj && liffObj.version);
+  const liffIsInClient = boolCell_(liffObj && liffObj.isInClient);
+  const liffIsLoggedIn = boolCell_(liffObj && liffObj.isLoggedIn);
+
+  sh.appendRow([
+    new Date(),
+    safeStr_(d.rowId),
+    "certificate_click",
+    1,
+    new Date(),
+
+    d.name || "",
+    d.age || "",
+    d.gender || "",
+
+    "", "", "", "", "",
+
+    d.resultType || "",
+    d.resultTH || "",
+    d.resultEN || "",
+
+    safeStr_(d.userId),
+
+    lineUserId, lineDisplayName, linePictureUrl,
+
+    liffOs, liffLang, liffVersion, liffIsInClient, liffIsLoggedIn,
+
+    JSON.stringify(profileObj || null),
+    JSON.stringify(liffObj || {}),
+    JSON.stringify(d.client || {}),
+    JSON.stringify(d.answers || [])
+  ]);
 }
 
-function appendQuizRow_(d) {
-  const lock = LockService.getScriptLock();
-  lock.waitLock(8000);
-  try {
-    const sh = getSheet_();
-    let code = String(d.sessionCode || "").trim();
-    if (!code || sessionExists_(code)) code = reserveSessionCode_();
-
-    sh.appendRow([
-      new Date(), code, Number(d.certificateClick || 0), "",
-      d.name || "", d.age || "", d.gender || "",
-      (d.answers && d.answers[0]) || "",
-      (d.answers && d.answers[1]) || "",
-      (d.answers && d.answers[2]) || "",
-      (d.answers && d.answers[3]) || "",
-      (d.answers && d.answers[4]) || "",
-      d.resultType || "", d.resultTH || "", d.resultEN || "",
-      String(d.userId || ""),
-      JSON.stringify(d.profile || null),
-      JSON.stringify(d.liffInfo || {}),
-      JSON.stringify(d.client || {}),
-      JSON.stringify(d.answers || [])
-    ]);
-
-    CacheService.getScriptCache().put(("tfc_sess_" + code).toLowerCase(), "1", 60 * 60);
-    return code;
-  } finally {
-    lock.releaseLock();
-  }
-}
-
-function markCertificateClick_(d) {
-  const code = String(d.sessionCode || "").trim();
-  if (!code) throw new Error("Missing sessionCode");
-
-  const lock = LockService.getScriptLock();
-  lock.waitLock(8000);
-  try {
-    const sh = getSheet_();
-    const lastRow = sh.getLastRow();
-    if (lastRow < 2) throw new Error("Sheet is empty");
-
-    const values = sh.getRange(2, 2, lastRow - 1, 1).getValues();
-    let foundRow = -1;
-    for (let i = values.length - 1; i >= 0; i--) {
-      if (String(values[i][0]).trim() === code) { foundRow = i + 2; break; }
-    }
-    if (foundRow === -1) throw new Error("sessionCode not found: " + code);
-
-    sh.getRange(foundRow, 3).setValue(1);
-    sh.getRange(foundRow, 4).setValue(new Date());
-    return code;
-  } finally {
-    lock.releaseLock();
-  }
-}
-
+/* =========================
+ * OA push (optional)
+ * ========================= */
 function getLineToken_() {
   return getOptionalProp_("LINE_CHANNEL_ACCESS_TOKEN");
 }
 
-function sendResultViaOA_(d, sessionCode) {
+function sendResultViaOA_(d, rowNum) {
   const token = getLineToken_();
   if (!token) return;
 
@@ -228,7 +235,7 @@ function sendResultViaOA_(d, sessionCode) {
   const resultEN = d.resultEN || "";
   const emoji = pickEmojiByType_(d.resultType);
 
-  const msgFlex = buildResultFlex_(name, resultTH, resultEN, emoji, sessionCode);
+  const msgFlex = buildResultFlex_(name, resultTH, resultEN, emoji, String(d.rowId || rowNum || ""));
 
   pushLine_(token, userId, [
     msgFlex,
@@ -245,7 +252,7 @@ function pickEmojiByType_(type) {
   return "✨";
 }
 
-function buildResultFlex_(name, resultTH, resultEN, emoji, sessionCode) {
+function buildResultFlex_(name, resultTH, resultEN, emoji, idText) {
   const alt = `ผลลัพธ์ของคุณคือ: ${resultTH}`;
   return {
     type: "flex",
@@ -271,15 +278,7 @@ function buildResultFlex_(name, resultTH, resultEN, emoji, sessionCode) {
             ]
           },
           resultEN ? { type: "text", text: resultEN, size: "sm", color: "#64748b", wrap: true } : { type: "spacer", size: "xs" },
-          {
-            type: "box",
-            layout: "vertical",
-            spacing: "xs",
-            contents: [
-              { type: "text", text: "ขอบคุณที่ร่วมสนุกนะครับ ✨", size: "sm", color: "#334155", wrap: true },
-              { type: "text", text: `Session: ${sessionCode}`, size: "xs", color: "#94a3b8", wrap: true }
-            ]
-          }
+          { type: "text", text: `ID: ${idText}`, size: "xs", color: "#94a3b8", wrap: true }
         ]
       }
     }
@@ -302,40 +301,48 @@ function pushLine_(token, to, messages) {
   if (code < 200 || code >= 300) throw new Error("LINE push failed: HTTP " + code + " " + res.getContentText());
 }
 
-function getLastAttemptByUserId_(userId) {
-  const sh = getSheet_();
-  const lastRow = sh.getLastRow();
-  if (lastRow < 2) return null;
-
-  const COL_USERID = 16;
-  const userVals = sh.getRange(2, COL_USERID, lastRow - 1, 1).getValues();
-
-  let foundRow = -1;
-  for (let i = userVals.length - 1; i >= 0; i--) {
-    if (String(userVals[i][0] || "").trim() === userId) { foundRow = i + 2; break; }
-  }
-  if (foundRow === -1) return null;
-
-  const row = sh.getRange(foundRow, 1, 1, 16).getValues()[0];
-  return {
-    tsServer: row[0],
-    sessionCode: row[1],
-    certificateClick: row[2],
-    certificateClickAt: row[3],
-    name: row[4],
-    age: row[5],
-    gender: row[6],
-    resultType: row[12],
-    resultTH: row[13],
-    resultEN: row[14],
-    userId: row[15],
+/* =========================
+ * Health + utils
+ * ========================= */
+function healthCheck_() {
+  const report = {
+    sheetIdPresent: false,
+    sheetOpenOk: false,
+    sheetName: SHEET_NAME,
+    headerOk: false,
+    lineTokenPresent: false,
+    errors: []
   };
+
+  try {
+    const sheetId = getRequiredProp_("SHEET_ID");
+    report.sheetIdPresent = true;
+
+    const ss = SpreadsheetApp.openById(sheetId);
+    report.sheetOpenOk = true;
+
+    const sh = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
+    ensureHeaderFast_(sh);
+    report.headerOk = true;
+  } catch (e) {
+    report.errors.push("Sheet error: " + asErrMsg_(e));
+  }
+
+  try {
+    const token = getOptionalProp_("LINE_CHANNEL_ACCESS_TOKEN");
+    report.lineTokenPresent = !!token;
+  } catch (e) {
+    report.errors.push("Token error: " + asErrMsg_(e));
+  }
+
+  return report;
 }
 
 function json_(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
 function asErrMsg_(err) {
   try {
     if (!err) return "Unknown error";

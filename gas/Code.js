@@ -59,6 +59,12 @@ function doPost(e) {
       return json_({ status: "ok", sessionCode: used });
     }
 
+    if (action === "get_last_attempt") {
+      const userId = String(data.userId || "").trim();
+      const rec = userId ? getLastAttemptByUserId_(userId) : null;
+      return json_({ status: "ok", found: !!rec, record: rec });
+    }
+
     return json_({ status: "error", message: "Unknown action: " + action });
   } catch (err) {
     return json_({ status: "error", message: asErrMsg_(err) });
@@ -418,4 +424,40 @@ function asErrMsg_(err) {
   } catch (e) {
     return "Unknown error";
   }
+}
+
+function getLastAttemptByUserId_(userId) {
+  const sh = getSheet_();
+  const lastRow = sh.getLastRow();
+  if (lastRow < 2) return null;
+
+  const COL_USERID = 16; // ตาม header: userId อยู่คอลัมน์ที่ 16
+  const userVals = sh.getRange(2, COL_USERID, lastRow - 1, 1).getValues();
+
+  // หาแถวล่าสุดจากล่างขึ้นบน
+  let foundRow = -1;
+  for (let i = userVals.length - 1; i >= 0; i--) {
+    if (String(userVals[i][0] || "").trim() === userId) {
+      foundRow = i + 2;
+      break;
+    }
+  }
+  if (foundRow === -1) return null;
+
+  // อ่านเฉพาะคอลัมน์สำคัญ (1..16 พอ)
+  const row = sh.getRange(foundRow, 1, 1, 16).getValues()[0];
+
+  return {
+    tsServer: row[0],
+    sessionCode: row[1],
+    certificateClick: row[2],
+    certificateClickAt: row[3],
+    name: row[4],
+    age: row[5],
+    gender: row[6],
+    resultType: row[12],
+    resultTH: row[13],
+    resultEN: row[14],
+    userId: row[15],
+  };
 }

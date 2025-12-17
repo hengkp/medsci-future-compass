@@ -1,3 +1,4 @@
+// web/assets/app.js
 const { LIFF_ID, GAS_WEBAPP_URL, OA_URL, CERT_GOOGLE_FORM_URL } = window.APP_CONFIG;
 
 let liffInfo = { os:"", lang:"", version:"", isInClient:false, isLoggedIn:false };
@@ -11,9 +12,12 @@ let lastResultType = "";
 let lastResultTH = "";
 let lastResultEN = "";
 
+let lastAttempt = null; // ✅ เก็บข้อมูล “เคยเล่นแล้ว” (จากชีท) เพื่อใช้เปิดเกียรติบัตรหน้าแรก
+
 const SESSION_KEY = "tfc_session_code";
 function $(id){ return document.getElementById(id); }
 
+/* ---------- UI helpers ---------- */
 function switchView(fromId, toId) {
   $(fromId).classList.add("hidden");
   $(toId).classList.remove("hidden");
@@ -33,10 +37,11 @@ function buildClientMeta() {
   return { tsClientISO: safeNowISO(), ua: navigator.userAgent || "", href: location.href || "", referrer: document.referrer || "" };
 }
 
+/* ---------- Backend helper (with retry) ---------- */
 async function callBackend_(action, data, { retries = 2 } = {}) {
   const payload = { action, data };
-
   let lastErr = null;
+
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const res = await fetch(GAS_WEBAPP_URL, {
@@ -46,7 +51,6 @@ async function callBackend_(action, data, { retries = 2 } = {}) {
         cache: "no-store",
       });
 
-      // ถ้าโดน redirect/login จะไม่ใช่ JSON
       let out = null;
       try { out = await res.json(); } catch {}
 
@@ -55,39 +59,44 @@ async function callBackend_(action, data, { retries = 2 } = {}) {
       return out;
     } catch (e) {
       lastErr = e;
-      // wait small before retry
       await new Promise(r => setTimeout(r, 250));
     }
   }
   throw lastErr || new Error("Load failed");
 }
 
-// ---- session storage ----
-function getSessionCodeLocal_(){ try { return sessionStorage.getItem(SESSION_KEY) || ""; } catch { return ""; } }
-function setSessionCodeLocal_(code){ try { sessionStorage.setItem(SESSION_KEY, code); } catch {} }
+/* ---------- Session (sheet-unique via server) ---------- */
+function getSessionCodeLocal_() {
+  try { return sessionStorage.getItem(SESSION_KEY) || ""; } catch { return ""; }
+}
+function setSessionCodeLocal_(code) {
+  try { sessionStorage.setItem(SESSION_KEY, code); } catch {}
+}
 
 async function ensureUniqueSessionCode_() {
   const local = getSessionCodeLocal_().trim();
   if (local) {
     try {
       const chk = await callBackend_("session_exists", { sessionCode: local });
-      if (chk.exists === false) return local;
+      if (chk && chk.exists === false) return local;
     } catch (_) {}
   }
-  const out = await callBackend_("reserve_session", {});
+
+  const out = await callBackend_("reserve_session", { hint: "client_init" });
   const code = String(out.sessionCode || "").trim();
-  if (!code) throw new Error("reserve_session returned empty");
+  if (!code) throw new Error("reserve_session returned empty code");
   setSessionCodeLocal_(code);
   return code;
 }
 
-// ---- landing validation ----
+/* ---------- Landing data + validation ---------- */
 function getLandingData_() {
   const name = ($("inp-name")?.value || "").trim();
   const age = ($("inp-age")?.value || "").toString().trim();
   const gender = ($("inp-gender")?.value || "").trim();
   return { name, age, gender };
 }
+
 function validateLanding_() {
   const { name, age, gender } = getLandingData_();
   const ageNum = Number(age);
@@ -95,9 +104,7 @@ function validateLanding_() {
   $("btn-start").disabled = !ok;
 }
 
-/* =====================
-   Questions (5 only)
-   ===================== */
+/* ---------- Questions + Archetypes ---------- */
 const questions = [
   { q: "1. ถ้าโลกถูกไวรัสปริศนาโจมตี น้องจะรับบทบาทไหน?", answers: [
     { text: "วิจัยหาวัคซีนในห้องแล็บ", type: "SCIENTIST" },
@@ -132,33 +139,25 @@ const questions = [
 ];
 
 const archetypes = {
-  HEALER: {
-    thTitle: "ผู้เยียวยาสังคม", enName: "The Social Healer", icon: "❤️",
-    desc: "หัวใจของคุณคือผู้ให้! มีความเห็นอกเห็นใจผู้อื่น และชอบทำงานที่ได้ช่วยเหลือผู้คนโดยตรง",
-    tip: "ทักษะการสื่อสารและจิตวิทยาเป็นอาวุธสำคัญของคุณ พัฒนามันให้ดีเยี่ยม",
-    jobs: ["บุคลากรทางการแพทย์", "นักสาธารณสุข", "เจ้าหน้าที่ควบคุมคุณภาพบริการ"],
-    wow: false,
+  HEALER: { thTitle:"ผู้เยียวยาสังคม", enName:"The Social Healer", icon:"❤️",
+    desc:"หัวใจของคุณคือผู้ให้! มีความเห็นอกเห็นใจผู้อื่น และชอบทำงานที่ได้ช่วยเหลือผู้คนโดยตรง",
+    tip:"ทักษะการสื่อสารและจิตวิทยาเป็นอาวุธสำคัญของคุณ พัฒนามันให้ดีเยี่ยม",
+    jobs:["บุคลากรทางการแพทย์","นักสาธารณสุข","เจ้าหน้าที่ควบคุมคุณภาพบริการ"], wow:false
   },
-  DATA: {
-    thTitle: "พ่อมดแห่งข้อมูล", enName: "The Data Wizard", icon: "💻",
-    desc: "คุณมองเห็นรูปแบบที่คนอื่นมองไม่เห็น! ชอบใช้ตรรกะและตัวเลขในการไขปัญหาซับซ้อน",
-    tip: "ลองศึกษาเรื่อง AI หรือการเขียนโปรแกรมเบื้องต้น จะช่วยติดปีกให้ความฝันคุณ",
-    jobs: ["นักวิเคราะห์ข้อมูลสุขภาพ (Health Data)", "นักสถิติการแพทย์", "ผู้เชี่ยวชาญเทคโนโลยีสุขภาพ"],
-    wow: true,
+  DATA: { thTitle:"พ่อมดแห่งข้อมูล", enName:"The Data Wizard", icon:"💻",
+    desc:"คุณมองเห็นรูปแบบที่คนอื่นมองไม่เห็น! ชอบใช้ตรรกะและตัวเลขในการไขปัญหาซับซ้อน",
+    tip:"ลองศึกษาเรื่อง AI หรือการเขียนโปรแกรมเบื้องต้น จะช่วยติดปีกให้ความฝันคุณ",
+    jobs:["นักวิเคราะห์ข้อมูลสุขภาพ (Health Data)","นักสถิติการแพทย์","ผู้เชี่ยวชาญเทคโนโลยีสุขภาพ"], wow:true
   },
-  CREATIVE: {
-    thTitle: "นักนวัตกรรมสร้างสรรค์", enName: "The Creative Innovator", icon: "🎨",
-    desc: "จินตนาการของคุณไม่มีที่สิ้นสุด! คุณสามารถเปลี่ยนเรื่องยากๆ ให้เข้าใจง่ายและสวยงาม",
-    tip: "ลองนำศิลปะมาผสมกับวิทยาศาสตร์ดูสิ คุณอาจสร้างสื่อการแพทย์ที่ล้ำสุดๆ ได้",
-    jobs: ["นักออกแบบผลิตภัณฑ์สุขภาพ", "Medical Illustrator", "นักสื่อสารวิทยาศาสตร์สุขภาพ"],
-    wow: false,
+  CREATIVE: { thTitle:"นักนวัตกรรมสร้างสรรค์", enName:"The Creative Innovator", icon:"🎨",
+    desc:"จินตนาการของคุณไม่มีที่สิ้นสุด! คุณสามารถเปลี่ยนเรื่องยากๆ ให้เข้าใจง่ายและสวยงาม",
+    tip:"ลองนำศิลปะมาผสมกับวิทยาศาสตร์ดูสิ คุณอาจสร้างสื่อการแพทย์ที่ล้ำสุดๆ ได้",
+    jobs:["นักออกแบบผลิตภัณฑ์สุขภาพ","Medical Illustrator","นักสื่อสารวิทยาศาสตร์สุขภาพ"], wow:false
   },
-  SCIENTIST: {
-    thTitle: "นักวิทยาศาสตร์ผู้พิทักษ์", enName: "The Guardian Scientist", icon: "🔬",
-    desc: "คุณคือยอดนักสืบแห่งโลกจุลทรรศน์! ช่างสังเกต ชอบค้นหาคำตอบด้วยเหตุผล และไม่ยอมแพ้ต่อปริศนา",
-    tip: "ฝึกฝนทักษะการสังเกตและการตั้งคำถาม 'ทำไม' บ่อยๆ คือกุญแจสู่ความสำเร็จของคุณ",
-    jobs: ["นักวิทยาศาสตร์การแพทย์", "เจ้าหน้าที่ห้องปฏิบัติการ", "นักวิจัย/นักนิติวิทยาศาสตร์"],
-    wow: true,
+  SCIENTIST: { thTitle:"นักวิทยาศาสตร์ผู้พิทักษ์", enName:"The Guardian Scientist", icon:"🔬",
+    desc:"คุณคือยอดนักสืบแห่งโลกจุลทรรศน์! ช่างสังเกต ชอบค้นหาคำตอบด้วยเหตุผล และไม่ยอมแพ้ต่อปริศนา",
+    tip:"ฝึกฝนทักษะการสังเกตและการตั้งคำถาม 'ทำไม' บ่อยๆ คือกุญแจสู่ความสำเร็จของคุณ",
+    jobs:["นักวิทยาศาสตร์การแพทย์","เจ้าหน้าที่ห้องปฏิบัติการ","นักวิจัย/นักนิติวิทยาศาสตร์"], wow:true
   },
 };
 
@@ -187,76 +186,7 @@ function setResultUI(type) {
   else wow.classList.add("hidden");
 }
 
-/* =====================
-   Landing validation
-   ===================== */
-function getLandingData_() {
-  const name = ($("inp-name")?.value || "").trim();
-  const age = ($("inp-age")?.value || "").toString().trim();
-  const gender = ($("inp-gender")?.value || "").trim();
-  return { name, age, gender };
-}
-
-function validateLanding_() {
-  const { name, age, gender } = getLandingData_();
-  const ageNum = Number(age);
-  const ok = !!name && !!gender && Number.isFinite(ageNum) && ageNum >= 1 && ageNum <= 120;
-  $("btn-start").disabled = !ok;
-}
-
-/* =====================
-   Backend helper
-   ===================== */
-async function callBackend_(action, data) {
-  const payload = { action, data };
-  const res = await fetch(GAS_WEBAPP_URL, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(payload),
-  });
-
-  let out = null;
-  try { out = await res.json(); } catch {}
-  if (!out) throw new Error("Backend returned non-JSON");
-  if (out.status === "error") throw new Error(out.message || "Backend error");
-  return out;
-}
-
-/* =====================
-   Session: reserve unique code via Google Sheet
-   ===================== */
-function getSessionCodeLocal_() {
-  try { return sessionStorage.getItem(SESSION_KEY) || ""; } catch { return ""; }
-}
-function setSessionCodeLocal_(code) {
-  try { sessionStorage.setItem(SESSION_KEY, code); } catch {}
-}
-
-async function ensureUniqueSessionCode_() {
-  // 1) If already have local code -> verify with server
-  const local = getSessionCodeLocal_().trim();
-  if (local) {
-    try {
-      const chk = await callBackend_("session_exists", { sessionCode: local });
-      // if NOT exists in sheet -> safe to keep
-      if (chk && chk.exists === false) return local;
-      // else already used -> reserve a new one
-    } catch (_) {
-      // if cannot check -> still reserve new (safer)
-    }
-  }
-
-  // 2) Reserve from server (server guarantees uniqueness)
-  const out = await callBackend_("reserve_session", { hint: "client_init" });
-  const code = (out.sessionCode || "").trim();
-  if (!code) throw new Error("reserve_session returned empty code");
-  setSessionCodeLocal_(code);
-  return code;
-}
-
-/* =====================
-   LIFF init with timeout (fix stuck)
-   ===================== */
+/* ---------- LIFF init (safe timeout) ---------- */
 function withTimeout_(p, ms, msg) {
   return Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error(msg||"timeout")), ms))]);
 }
@@ -293,7 +223,36 @@ async function initLiffSafe_() {
   }
 }
 
-// ---- boot ----
+/* ---------- NEW: load last attempt (LINE only) ---------- */
+async function loadLastAttemptForLine_() {
+  const userId = String(lineProfile?.userId || "").trim();
+  if (!userId) return;
+
+  try {
+    const out = await callBackend_("get_last_attempt", { userId });
+    if (!out || !out.found || !out.record) return;
+
+    lastAttempt = out.record;
+
+    // ✅ ถ้า record มี sessionCode ให้ใช้ตัวนั้น เพื่อ map การกด certificate ถูก row
+    if (lastAttempt.sessionCode) setSessionCodeLocal_(String(lastAttempt.sessionCode).trim());
+
+    // ✅ เติมข้อมูล “ชื่อ/อายุ/เพศ” ให้ช่องกรอก
+    if (lastAttempt.name && !$("inp-name").value.trim()) $("inp-name").value = lastAttempt.name;
+    if (lastAttempt.age && !$("inp-age").value.trim()) $("inp-age").value = String(lastAttempt.age);
+    if (lastAttempt.gender && !$("inp-gender").value.trim()) $("inp-gender").value = lastAttempt.gender;
+
+    // ✅ แสดงปุ่มรับเกียรติบัตรบนหน้าแรก
+    const wrap = $("landing-cert-wrap");
+    if (wrap) wrap.classList.remove("hidden");
+
+    validateLanding_();
+  } catch (e) {
+    console.warn("get_last_attempt failed:", e);
+  }
+}
+
+/* ---------- Boot ---------- */
 window.addEventListener("DOMContentLoaded", async () => {
   $("inp-name").addEventListener("input", validateLanding_);
   $("inp-age").addEventListener("input", validateLanding_);
@@ -301,7 +260,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   await initLiffSafe_();
 
-  // health check (ช่วย diagnose “Load failed” ได้ทันที)
+  // health check (ช่วยบอก “เชื่อมต่อชีทไม่สำเร็จ”)
   try {
     await callBackend_("health", {});
   } catch (e) {
@@ -309,12 +268,16 @@ window.addEventListener("DOMContentLoaded", async () => {
     setStatus(false, "⚠️ เชื่อมต่อชีทไม่สำเร็จ (ตรวจ Deploy/URL ของ GAS)");
   }
 
+  // reserve session (สำหรับคนใหม่)
   try { await ensureUniqueSessionCode_(); } catch (e) { console.warn("reserve session failed:", e); }
+
+  // ✅ NEW: ถ้าเป็น LINE และเคยเล่นแล้ว -> เติมข้อมูล + โชว์ปุ่มรับเกียรติบัตรหน้าแรก
+  await loadLastAttemptForLine_();
 
   validateLanding_();
 });
 
-// ---- quiz flow ----
+/* ---------- Quiz flow ---------- */
 function resetQuizState_() {
   currentQ = 0;
   scores = { SCIENTIST: 0, DATA: 0, HEALER: 0, CREATIVE: 0 };
@@ -358,7 +321,7 @@ function renderQuestion_() {
 async function onQuizCompleted_() {
   const { name, age, gender } = getLandingData_();
   let sessionCode = getSessionCodeLocal_().trim();
-  if (!sessionCode) sessionCode = await ensureUniqueSessionCode_().catch(()=>"");
+  if (!sessionCode) sessionCode = await ensureUniqueSessionCode_().catch(()=> "");
 
   const type = computeResultType();
   const r = archetypes[type];
@@ -380,8 +343,7 @@ async function onQuizCompleted_() {
       resultTH: lastResultTH,
       resultEN: lastResultEN,
 
-      // IMPORTANT: userId for OA push
-      userId: lineProfile?.userId || "",
+      userId: String(lineProfile?.userId || ""),
 
       liffInfo: { ...liffInfo },
       profile: lineProfile || null,
@@ -389,35 +351,57 @@ async function onQuizCompleted_() {
     });
 
     if (out?.sessionCode && out.sessionCode !== sessionCode) setSessionCodeLocal_(out.sessionCode);
+
+    // ✅ หลังเล่นเสร็จ ให้หน้าแรก “มีสิทธิ์รับเกียรติบัตร” ด้วย
+    lastAttempt = {
+      sessionCode: out?.sessionCode || sessionCode,
+      name, age, gender,
+      resultType: lastResultType,
+      resultTH: lastResultTH,
+      resultEN: lastResultEN
+    };
   } catch (e) {
     console.error("quiz_complete failed:", e);
     alert("บันทึกลงชีทไม่สำเร็จ: " + (e?.message || e));
   }
 }
 
-window.openCertificateFormExternal = async function openCertificateFormExternal() {
+/* ---------- Certificate buttons ---------- */
+async function logCertificateClick_() {
   const { name, age, gender } = getLandingData_();
-  let sessionCode = getSessionCodeLocal_().trim();
-  if (!sessionCode) sessionCode = await ensureUniqueSessionCode_().catch(()=>"");
+
+  // ใช้ sessionCode จาก record ล่าสุดก่อน (แม่นสุด)
+  let sessionCode =
+    String(lastAttempt?.sessionCode || "").trim() ||
+    getSessionCodeLocal_().trim() ||
+    (await ensureUniqueSessionCode_().catch(()=> ""));
+
+  // ดึงผลลัพธ์จาก current run หรือจาก lastAttempt
+  const payload = {
+    sessionCode,
+    certificateClick: 1,
+    name, age, gender,
+
+    resultType: lastResultType || lastAttempt?.resultType || "",
+    resultTH:   lastResultTH   || lastAttempt?.resultTH   || "",
+    resultEN:   lastResultEN   || lastAttempt?.resultEN   || "",
+
+    userId: String(lineProfile?.userId || ""),
+
+    liffInfo: { ...liffInfo },
+    profile: lineProfile || null,
+    client: buildClientMeta(),
+  };
 
   try {
-    const out = await callBackend_("certificate_click", {
-      sessionCode,
-      certificateClick: 1,
-      name, age, gender,
-      resultType: lastResultType,
-      resultTH: lastResultTH,
-      resultEN: lastResultEN,
-      userId: lineProfile?.userId || "",
-      liffInfo: { ...liffInfo },
-      profile: lineProfile || null,
-      client: buildClientMeta(),
-    });
+    const out = await callBackend_("certificate_click", payload);
     if (out?.sessionCode && out.sessionCode !== sessionCode) setSessionCodeLocal_(out.sessionCode);
   } catch (e) {
     console.warn("certificate_click failed:", e);
   }
+}
 
+function openFormExternal_() {
   try {
     if (typeof liff !== "undefined" && liff.openWindow) {
       liff.openWindow({ url: CERT_GOOGLE_FORM_URL, external: true });
@@ -425,11 +409,20 @@ window.openCertificateFormExternal = async function openCertificateFormExternal(
     }
   } catch (_) {}
   window.open(CERT_GOOGLE_FORM_URL, "_blank");
+}
+
+// ✅ ใช้ทั้งหน้าแรก + หน้าผลลัพธ์
+window.openCertificateFromLanding = async function openCertificateFromLanding() {
+  await logCertificateClick_();
+  openFormExternal_();
 };
 
-/* =====================
-   Result buttons
-   ===================== */
+window.openCertificateFormExternal = async function openCertificateFormExternal() {
+  await logCertificateClick_();
+  openFormExternal_();
+};
+
+/* ---------- Other buttons ---------- */
 window.restartToLanding = function restartToLanding() {
   resetQuizState_();
   const hasLineName = !!(lineProfile?.displayName);
@@ -448,36 +441,4 @@ window.goOA = function goOA() {
     }
   } catch (_) {}
   window.location.href = OA_URL;
-};
-
-window.openCertificateFormExternal = async function openCertificateFormExternal() {
-  const { name, age, gender } = getLandingData_();
-  const sessionCode = getSessionCodeLocal_().trim() || (await ensureUniqueSessionCode_().catch(() => ""));
-
-  try {
-    const out = await callBackend_("certificate_click", {
-      sessionCode,
-      certificateClick: 1,
-      name, age, gender,
-      resultType: lastResultType,
-      resultTH: lastResultTH,
-      resultEN: lastResultEN,
-      liffInfo: { ...liffInfo },
-      profile: lineProfile || null,
-      client: buildClientMeta(),
-    });
-    if (out && out.sessionCode && out.sessionCode !== sessionCode) {
-      setSessionCodeLocal_(out.sessionCode);
-    }
-  } catch (e) {
-    console.error("certificate_click failed:", e);
-  }
-
-  try {
-    if (typeof liff !== "undefined" && liff.openWindow) {
-      liff.openWindow({ url: CERT_GOOGLE_FORM_URL, external: true });
-      return;
-    }
-  } catch (_) {}
-  window.open(CERT_GOOGLE_FORM_URL, "_blank");
 };

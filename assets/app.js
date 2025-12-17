@@ -10,10 +10,8 @@ let userAnswers = [];
 let lastResultType = "";
 let lastResultTH = "";
 let lastResultEN = "";
-let sentResultMessage = false;
 
 const SESSION_KEY = "tfc_session_code";
-
 function $(id){ return document.getElementById(id); }
 
 function switchView(fromId, toId) {
@@ -31,14 +29,70 @@ function setStatus(ok, html) {
 }
 
 function safeNowISO(){ try { return new Date().toISOString(); } catch { return ""; } }
-
 function buildClientMeta() {
-  return {
-    tsClientISO: safeNowISO(),
-    ua: navigator.userAgent || "",
-    href: location.href || "",
-    referrer: document.referrer || "",
-  };
+  return { tsClientISO: safeNowISO(), ua: navigator.userAgent || "", href: location.href || "", referrer: document.referrer || "" };
+}
+
+async function callBackend_(action, data, { retries = 2 } = {}) {
+  const payload = { action, data };
+
+  let lastErr = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(GAS_WEBAPP_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" }, // no-preflight
+        body: JSON.stringify(payload),
+        cache: "no-store",
+      });
+
+      // ถ้าโดน redirect/login จะไม่ใช่ JSON
+      let out = null;
+      try { out = await res.json(); } catch {}
+
+      if (!out) throw new Error(`Backend non-JSON (HTTP ${res.status})`);
+      if (out.status === "error") throw new Error(out.message || "Backend error");
+      return out;
+    } catch (e) {
+      lastErr = e;
+      // wait small before retry
+      await new Promise(r => setTimeout(r, 250));
+    }
+  }
+  throw lastErr || new Error("Load failed");
+}
+
+// ---- session storage ----
+function getSessionCodeLocal_(){ try { return sessionStorage.getItem(SESSION_KEY) || ""; } catch { return ""; } }
+function setSessionCodeLocal_(code){ try { sessionStorage.setItem(SESSION_KEY, code); } catch {} }
+
+async function ensureUniqueSessionCode_() {
+  const local = getSessionCodeLocal_().trim();
+  if (local) {
+    try {
+      const chk = await callBackend_("session_exists", { sessionCode: local });
+      if (chk.exists === false) return local;
+    } catch (_) {}
+  }
+  const out = await callBackend_("reserve_session", {});
+  const code = String(out.sessionCode || "").trim();
+  if (!code) throw new Error("reserve_session returned empty");
+  setSessionCodeLocal_(code);
+  return code;
+}
+
+// ---- landing validation ----
+function getLandingData_() {
+  const name = ($("inp-name")?.value || "").trim();
+  const age = ($("inp-age")?.value || "").toString().trim();
+  const gender = ($("inp-gender")?.value || "").trim();
+  return { name, age, gender };
+}
+function validateLanding_() {
+  const { name, age, gender } = getLandingData_();
+  const ageNum = Number(age);
+  const ok = !!name && !!gender && Number.isFinite(ageNum) && ageNum >= 1 && ageNum <= 120;
+  $("btn-start").disabled = !ok;
 }
 
 /* =====================
@@ -203,18 +257,13 @@ async function ensureUniqueSessionCode_() {
 /* =====================
    LIFF init with timeout (fix stuck)
    ===================== */
-function withTimeout_(promise, ms, timeoutMessage) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(timeoutMessage || "timeout")), ms))
-  ]);
+function withTimeout_(p, ms, msg) {
+  return Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error(msg||"timeout")), ms))]);
 }
 
 async function initLiffSafe_() {
-  // Always show something quickly (never stuck)
   setStatus(false, "👤 กำลังเตรียมระบบ...");
 
-  // If LIFF script not available -> guest mode
   if (typeof liff === "undefined") {
     setStatus(false, "👤 โหมดบุคคลทั่วไป (กรอกข้อมูลแล้วเริ่มได้เลย)");
     return;
@@ -239,44 +288,33 @@ async function initLiffSafe_() {
       setStatus(false, "👤 โหมดบุคคลทั่วไป (กรอกข้อมูลแล้วเริ่มได้เลย)");
     }
   } catch (e) {
-    // On any LIFF failure -> guest mode, but not stuck
     console.error("LIFF init failed:", e);
     setStatus(false, "👤 โหมดบุคคลทั่วไป (กรอกข้อมูลแล้วเริ่มได้เลย)");
   }
 }
 
-/* =====================
-   Boot (DOMContentLoaded)
-   ===================== */
+// ---- boot ----
 window.addEventListener("DOMContentLoaded", async () => {
-  // Global error -> show in status so you don't get stuck silently
-  window.addEventListener("error", (ev) => {
-    console.error("Global error:", ev?.error || ev?.message || ev);
-    setStatus(false, "⚠️ โหลดระบบไม่สำเร็จ (ตรวจ Console) / เปิดใหม่อีกครั้ง");
-  });
-
   $("inp-name").addEventListener("input", validateLanding_);
   $("inp-age").addEventListener("input", validateLanding_);
   $("inp-gender").addEventListener("change", validateLanding_);
 
-  // Start LIFF (never stuck)
   await initLiffSafe_();
 
-  // Reserve unique session (server checks sheet)
+  // health check (ช่วย diagnose “Load failed” ได้ทันที)
   try {
-    const code = await ensureUniqueSessionCode_();
-    console.log("Session code:", code);
+    await callBackend_("health", {});
   } catch (e) {
-    console.error("Session reserve failed:", e);
-    // still allow user to play
+    console.error("health failed:", e);
+    setStatus(false, "⚠️ เชื่อมต่อชีทไม่สำเร็จ (ตรวจ Deploy/URL ของ GAS)");
   }
+
+  try { await ensureUniqueSessionCode_(); } catch (e) { console.warn("reserve session failed:", e); }
 
   validateLanding_();
 });
 
-/* =====================
-   Quiz flow
-   ===================== */
+// ---- quiz flow ----
 function resetQuizState_() {
   currentQ = 0;
   scores = { SCIENTIST: 0, DATA: 0, HEALER: 0, CREATIVE: 0 };
@@ -284,12 +322,11 @@ function resetQuizState_() {
   lastResultType = "";
   lastResultTH = "";
   lastResultEN = "";
-  sentResultMessage = false;
 }
 
 window.startQuiz = function startQuiz() {
   resetQuizState_();
-  switchView("view-landing", "view-quiz");
+  switchView("view-landing","view-quiz");
   renderQuestion_();
 };
 
@@ -320,12 +357,8 @@ function renderQuestion_() {
 
 async function onQuizCompleted_() {
   const { name, age, gender } = getLandingData_();
-
-  // Ensure we have a unique session (if local is used already, server will replace)
   let sessionCode = getSessionCodeLocal_().trim();
-  if (!sessionCode) {
-    try { sessionCode = await ensureUniqueSessionCode_(); } catch (_) {}
-  }
+  if (!sessionCode) sessionCode = await ensureUniqueSessionCode_().catch(()=>"");
 
   const type = computeResultType();
   const r = archetypes[type];
@@ -334,7 +367,7 @@ async function onQuizCompleted_() {
   lastResultEN = r.enName;
 
   setResultUI(type);
-  switchView("view-quiz", "view-result");
+  switchView("view-quiz","view-result");
 
   try {
     const out = await callBackend_("quiz_complete", {
@@ -347,47 +380,52 @@ async function onQuizCompleted_() {
       resultTH: lastResultTH,
       resultEN: lastResultEN,
 
+      // IMPORTANT: userId for OA push
+      userId: lineProfile?.userId || "",
+
       liffInfo: { ...liffInfo },
       profile: lineProfile || null,
       client: buildClientMeta(),
     });
 
-    // If server replaced sessionCode (collision), update local
-    if (out && out.sessionCode && out.sessionCode !== sessionCode) {
-      setSessionCodeLocal_(out.sessionCode);
-    }
+    if (out?.sessionCode && out.sessionCode !== sessionCode) setSessionCodeLocal_(out.sessionCode);
   } catch (e) {
     console.error("quiz_complete failed:", e);
     alert("บันทึกลงชีทไม่สำเร็จ: " + (e?.message || e));
   }
-
-  await sendResultMessageOnce_(name, lastResultTH);
 }
 
-/* =====================
-   Send LINE message once
-   ===================== */
-async function sendResultMessageOnce_(name, resultTH) {
-  if (sentResultMessage) return;
-  sentResultMessage = true;
+window.openCertificateFormExternal = async function openCertificateFormExternal() {
+  const { name, age, gender } = getLandingData_();
+  let sessionCode = getSessionCodeLocal_().trim();
+  if (!sessionCode) sessionCode = await ensureUniqueSessionCode_().catch(()=>"");
 
   try {
-    if (typeof liff === "undefined") return;
-    if (!(liff.isInClient && liff.isInClient())) return;
-    if (!(liff.isLoggedIn && liff.isLoggedIn())) return;
-    if (!liff.sendMessages) return;
-
-    const safeName = name || (lineProfile?.displayName || "เพื่อนใหม่");
-    const text =
-      `สวัสดี ${safeName} 👋\n` +
-      `ขอบคุณที่ร่วมสนุกกับ "The Future Compass 🧭"\n` +
-      `ผลลัพธ์ของคุณคือ: "${resultTH}" ✨`;
-
-    await liff.sendMessages([{ type: "text", text }]);
+    const out = await callBackend_("certificate_click", {
+      sessionCode,
+      certificateClick: 1,
+      name, age, gender,
+      resultType: lastResultType,
+      resultTH: lastResultTH,
+      resultEN: lastResultEN,
+      userId: lineProfile?.userId || "",
+      liffInfo: { ...liffInfo },
+      profile: lineProfile || null,
+      client: buildClientMeta(),
+    });
+    if (out?.sessionCode && out.sessionCode !== sessionCode) setSessionCodeLocal_(out.sessionCode);
   } catch (e) {
-    console.warn("sendMessages blocked:", e);
+    console.warn("certificate_click failed:", e);
   }
-}
+
+  try {
+    if (typeof liff !== "undefined" && liff.openWindow) {
+      liff.openWindow({ url: CERT_GOOGLE_FORM_URL, external: true });
+      return;
+    }
+  } catch (_) {}
+  window.open(CERT_GOOGLE_FORM_URL, "_blank");
+};
 
 /* =====================
    Result buttons
